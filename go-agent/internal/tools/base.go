@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -65,4 +67,149 @@ func rejectDangerousCommand(command string) error {
 		}
 	}
 	return nil
+}
+
+// SafePath 把模型传入的路径固定到 workdir 之内。
+// 文件工具都必须先走这一层：模型可以提出路径，但不能越过 harness 给它划定的工作区边界。
+func SafePath(workdir, requested string) (string, error) {
+	if strings.TrimSpace(requested) == "" {
+		return "", fmt.Errorf("path is required")
+	}
+	root, err := filepath.Abs(workdir)
+	if err != nil {
+		return "", err
+	}
+	candidate := requested
+	if !filepath.IsAbs(candidate) {
+		candidate = filepath.Join(root, candidate)
+	}
+	candidate, err = filepath.Abs(candidate)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(root, candidate)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes workspace: %s", requested)
+	}
+	return candidate, nil
+}
+
+// RegisterFileTools 注册 s02 引入的专用文件工具。
+// 它们比让模型自己拼 shell 命令更可靠：参数可校验、路径可沙箱、输出格式也更稳定。
+func RegisterFileTools(reg *Registry, workdir string) {
+	reg.Register(Tool{
+		Spec: Spec("read_file", "Read a text file from the current workspace.", map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path":  map[string]any{"type": "string", "description": "Path to read, relative to the workspace."},
+				"limit": map[string]any{"type": "integer", "description": "Optional maximum number of lines to return."},
+			},
+			"required": []string{"path"},
+		}),
+		Handler: func(input map[string]any) (string, error) {
+			path, err := stringArg(input, "path")
+			if err != nil {
+				return "", err
+			}
+			safe, err := SafePath(workdir, path)
+			if err != nil {
+				return "", err
+			}
+			data, err := os.ReadFile(safe)
+			if err != nil {
+				return "", err
+			}
+			return limitLines(string(data), intArg(input, "limit", 0)), nil
+		},
+	})
+
+	reg.Register(Tool{
+		Spec: Spec("write_file", "Write a text file inside the current workspace.", map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path":    map[string]any{"type": "string", "description": "Path to write, relative to the workspace."},
+				"content": map[string]any{"type": "string", "description": "Complete file content to write."},
+			},
+			"required": []string{"path", "content"},
+		}),
+		Handler: func(input map[string]any) (string, error) {
+			path, err := stringArg(input, "path")
+			if err != nil {
+				return "", err
+			}
+			content, err := stringArg(input, "content")
+			if err != nil {
+				return "", err
+			}
+			safe, err := SafePath(workdir, path)
+			if err != nil {
+				return "", err
+			}
+			if err := os.MkdirAll(filepath.Dir(safe), 0o755); err != nil {
+				return "", err
+			}
+			if err := os.WriteFile(safe, []byte(content), 0o644); err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("Wrote %s (%d bytes)", path, len(content)), nil
+		},
+	})
+
+	reg.Register(Tool{
+		Spec: Spec("edit_file", "Replace the first matching text in a file inside the current workspace.", map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path":     map[string]any{"type": "string", "description": "Path to edit, relative to the workspace."},
+				"old_text": map[string]any{"type": "string", "description": "Existing text to replace. Only the first match is replaced."},
+				"new_text": map[string]any{"type": "string", "description": "Replacement text."},
+			},
+			"required": []string{"path", "old_text", "new_text"},
+		}),
+		Handler: func(input map[string]any) (string, error) {
+			path, err := stringArg(input, "path")
+			if err != nil {
+				return "", err
+			}
+			oldText, err := stringArg(input, "old_text")
+			if err != nil {
+				return "", err
+			}
+			newText, err := stringArg(input, "new_text")
+			if err != nil {
+				return "", err
+			}
+			safe, err := SafePath(workdir, path)
+			if err != nil {
+				return "", err
+			}
+			data, err := os.ReadFile(safe)
+			if err != nil {
+				return "", err
+			}
+			text := string(data)
+			index := strings.Index(text, oldText)
+			if index < 0 {
+				return "", fmt.Errorf("text not found in %s", path)
+			}
+			updated := text[:index] + newText + text[index+len(oldText):]
+			if err := os.WriteFile(safe, []byte(updated), 0o644); err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("Edited %s", path), nil
+		},
+	})
+}
+
+func limitLines(text string, limit int) string {
+	if limit <= 0 {
+		return strings.TrimRight(text, "\n")
+	}
+	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	if len(lines) <= limit {
+		return strings.Join(lines, "\n")
+	}
+	return strings.Join(lines[:limit], "\n")
 }

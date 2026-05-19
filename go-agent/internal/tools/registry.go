@@ -84,3 +84,24 @@ func stringArg(input map[string]any, name string) (string, error) {
 	}
 	return text, nil
 }
+
+// intArg 读取可选整数参数。
+// JSON 解码后的数字常见类型是 float64，工具层要兼容它，避免模型传入 limit 后类型断言失败。
+func intArg(input map[string]any, name string, fallback int) int {
+	value, ok := input[name]
+	if !ok || value == nil {
+		return fallback
+	}
+	switch n := value.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case float64:
+		return int(n)
+	case float32:
+		return int(n)
+	default:
+		return fallback
+	}
+}
