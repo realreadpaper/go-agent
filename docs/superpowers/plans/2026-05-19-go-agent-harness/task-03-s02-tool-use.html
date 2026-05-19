@@ -222,7 +222,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 测试 PASS；CLI 可让模型调用文件工具。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖路径沙箱和文件工具稳定输出：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/tools ./internal/agent
+<span class="kw">go</span> vet ./internal/tools ./internal/agent</code></pre>
+<p>真实模型验证要让模型依次写文件、读文件、编辑文件，并确认 <code>../</code> 逃逸会被拒绝：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s02-tool-use <span class="str">&quot;Create tmp/greet.go with a greet function, read it, edit it to add a Chinese comment, then try to read ../outside.txt and report the sandbox error.&quot;</span></code></pre>
+<p>Expected: <code>tmp/greet.go</code> 存在且内容被编辑；输出中能看到 <code>read_file</code>、<code>write_file</code>、<code>edit_file</code> 的调用结果，以及路径逃逸错误。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/tools <span class="kw">go</span>-agent/cmd/s02-tool-use
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add file tools and dispatch&quot;</span></code></pre>

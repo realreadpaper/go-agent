@@ -234,7 +234,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 测试 PASS；CLI 能列出可用 skill。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖 skill 发现、frontmatter 解析、触发规则和缺失文件错误：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/skills ./internal/tools
+<span class="kw">go</span> vet ./internal/skills</code></pre>
+<p>真实模型验证要让模型先列 skill，再加载一个本地 skill，并在回答中说明它使用了哪条本地规则：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s05-skill-loading <span class="str">&quot;List available skills, load the git-commit skill if present, and summarize its commit safety rules in Chinese.&quot;</span></code></pre>
+<p>Expected: 输出包含 skill 名称、路径和中文规则摘要；不存在的 skill 应返回清晰错误而不是 panic。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/skills <span class="kw">go</span>-agent/skills <span class="kw">go</span>-agent/cmd/s05-skill-loading <span class="kw">go</span>-agent/<span class="kw">go</span>.mod <span class="kw">go</span>-agent/<span class="kw">go</span>.sum
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add on-demand skill loading&quot;</span></code></pre>

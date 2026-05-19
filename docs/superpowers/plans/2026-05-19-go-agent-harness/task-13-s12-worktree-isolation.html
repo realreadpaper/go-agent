@@ -265,7 +265,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 任务与 worktree 双向绑定；remove 可同时完成任务并移除 worktree。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要在临时 git 仓库里跑，确认不会污染当前工作区：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/worktree ./internal/tasks
+<span class="kw">go</span> vet ./internal/worktree ./internal/tasks</code></pre>
+<p>真实 CLI 验证要在一个干净 git 仓库中创建 worktree、运行命令、保留或移除 worktree：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s12-worktree-task-isolation <span class="str">&quot;Create task 1 if needed, create worktree auth-refactor for it, run git status inside that worktree, then list worktree events.&quot;</span></code></pre>
+<p>Expected: <code>.worktrees/index.json</code> 和 <code>.worktrees/events.jsonl</code> 可观察；<code>worktree_run</code> 的 cwd 是隔离 worktree，不是主仓库。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/worktree <span class="kw">go</span>-agent/cmd/s12-worktree-task-isolation
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add worktree task isolation&quot;</span></code></pre>

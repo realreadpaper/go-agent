@@ -247,7 +247,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: <code>.team/config.json</code> 和 <code>.team/inbox/*.jsonl</code> 可观察。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖队友配置、inbox JSONL、消息投递和 goroutine 生命周期：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/team ./internal/background
+<span class="kw">go</span> <span class="kw">test</span> -race ./internal/team</code></pre>
+<p>真实模型验证要创建两个队友，互发一条状态消息，并读取 inbox：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s09-agent-teams <span class="str">&quot;Spawn alice as coder and bob as reviewer. Send bob a message asking for status, then show bob's inbox.&quot;</span></code></pre>
+<p>Expected: <code>.team/config.json</code> 记录队友；<code>.team/inbox/bob.jsonl</code> 出现消息；停止队友后 goroutine 能退出。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/cmd/s09-agent-teams
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add persistent agent teams&quot;</span></code></pre>

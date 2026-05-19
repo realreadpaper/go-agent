@@ -231,7 +231,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 测试 PASS；<code>.transcripts/</code> 写入 JSONL。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要确认压缩前后消息数量、摘要内容和 transcript 落盘：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/compact ./internal/agent
+<span class="kw">go</span> vet ./internal/compact</code></pre>
+<p>真实模型验证要先制造一段较长对话，再手动触发 compact，随后要求模型继续使用压缩摘要回答：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s06-context-compact <span class="str">&quot;Create a short project note, read it, compact the context, then explain what survived in the summary.&quot;</span></code></pre>
+<p>Expected: <code>.transcripts/</code> 下出现 JSONL；压缩后 messages 中保留摘要和最近关键消息，模型仍能说出压缩前的重要事实。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/compact <span class="kw">go</span>-agent/cmd/s06-context-compact
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add context compaction&quot;</span></code></pre>

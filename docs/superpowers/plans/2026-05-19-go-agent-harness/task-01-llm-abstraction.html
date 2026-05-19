@@ -172,13 +172,13 @@ li { margin: 4px 0; color: var(--text-muted); }
 <ul><li><strong>Message：</strong>对话历史中的一条记录。用户输入、助手回复、工具结果都会变成 message，agent loop 靠它们让模型知道刚才发生了什么。</li>
 <li><strong>ToolSpec：</strong>告诉模型“有哪些工具可以用、参数长什么样”。模型不会真的执行工具，它只会输出一个结构化的 tool call。</li>
 <li><strong>Response：</strong>模型返回的内容，可能是普通文本，也可能是 tool_use。后续循环会根据 <code>stop_reason</code> 决定是否执行工具。</li>
-<li><strong>FakeClient：</strong>测试用的假模型。它让我们不用真实 API key，也能验证 loop、工具分发和状态机。</li></ul>
+<li><strong>Scripted test client：</strong>测试用的脚本化模型。业务包可以在自己的测试里实现最小 fake，不需要把 fake provider 放进生产 <code>internal/llm</code>。</li></ul>
 
 <h3>为什么这样拆</h3>
 <p><code>internal/llm</code> 只负责协议转换，不知道 agent、任务、文件系统或团队协作。这样后续从 OpenAI Responses 换成 OpenAI-compatible Chat 或 DeepSeek adapter 时，agent 主流程不需要改。第一次读代码时，可以把这层看成“模型插座”：外面接不同 provider，里面统一输出 Go 结构体。</p>
 
 <h3>完成后应该理解</h3>
-<p>你应该能解释一次 LLM 调用需要哪些输入、模型如何表达“我要调用工具”、为什么业务测试必须依赖 fake client，以及为什么 provider adapter 不能执行工具。</p>
+<p>你应该能解释一次 LLM 调用需要哪些输入、模型如何表达“我要调用工具”、为什么业务测试要避免真实网络，以及为什么 provider adapter 不能执行工具。</p>
 
 <hr>
 
@@ -191,8 +191,6 @@ li { margin: 4px 0; color: var(--text-muted); }
 <li>Create: <code>go-agent/internal/llm/openai_chat.go</code></li>
 <li>Create: <code>go-agent/internal/llm/anthropic_compat.go</code></li>
 <li>Create: <code>go-agent/internal/llm/deepseek.go</code></li>
-<li>Create: <code>go-agent/internal/llm/fake.go</code></li>
-<li>Test: <code>go-agent/internal/llm/fake_test.go</code></li>
 <li>Test: <code>go-agent/internal/llm/config_test.go</code></li>
 <li>Test: <code>go-agent/internal/llm/openai_responses_test.go</code></li>
 <li>Test: <code>go-agent/internal/llm/openai_chat_test.go</code></li>
@@ -213,24 +211,23 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: <code>go.mod</code> 存在，module 为 <code>learn-claude-code-go</code>。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 写 <code>llm</code> 类型、配置解析与 fake client 测试**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 写 <code>llm</code> 类型、配置解析与配置测试**</span>
 <div class="step-detail">
 <p>类型定义见 overview 核心数据模型中的 <code>internal/llm/types.go</code> 和 <code>internal/llm/config.go</code>。</p>
 
 <p>测试覆盖：</p>
-<ul><li><code>FakeClient</code> 按顺序返回预设响应；响应耗尽时返回错误。</li>
-<li><code>DefaultConfigFromEnv()</code> 可解析 OpenAI GPT-5.5：</li></ul>
+<ul><li><code>DefaultConfigFromEnv()</code> 可解析 OpenAI GPT-5.5：</li></ul>
 
 <pre><code class="lang-bash">AGENT_LLM_PROVIDER=openai
 AGENT_LLM_API_STYLE=openai_responses
 AGENT_MODEL=gpt-5.5
 OPENAI_API_KEY=<span class="kw">test</span>-key</code></pre>
 
-<ul><li><code>DefaultConfigFromEnv()</code> 可解析 DeepSeek V4 Pro：</li></ul>
+<ul><li><code>DefaultConfigFromEnv()</code> 可解析 DeepSeek V4 Flash：</li></ul>
 
 <pre><code class="lang-bash">AGENT_LLM_PROVIDER=deepseek
-AGENT_LLM_API_STYLE=anthropic_messages
-AGENT_MODEL=deepseek-v4-pro
+AGENT_LLM_API_STYLE=openai_chat
+AGENT_MODEL=deepseek-v4-flash
 DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 
 <ul><li>缺少 provider 对应 API key 时返回清晰错误。</li></ul>
@@ -317,9 +314,9 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>要求：</p>
 <ul><li><code>Provider=deepseek</code> 且 <code>APIStyle=anthropic_messages</code> 时创建 <code>AnthropicCompatClient</code>。</li>
 <li><code>Provider=deepseek</code> 且 <code>APIStyle=openai_chat</code> 时创建 <code>OpenAIChatClient</code>。</li>
-<li>默认模型为 <code>deepseek-v4-pro</code>。</li>
-<li>默认 API style 为 <code>anthropic_messages</code>。</li>
-<li><code>deepseek-v4-flash</code> 作为 README 中的低成本示例，不作为默认值。</li></ul>
+<li>默认模型为 <code>deepseek-v4-flash</code>。</li>
+<li>默认 API style 为 <code>openai_chat</code>。</li>
+<li><code>deepseek-v4-pro</code> 可以作为 README 中的高能力示例，但不作为默认值。</li></ul>
 </div>
 </div>
 <div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 实现 client factory**</span>
@@ -344,7 +341,19 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: PASS。测试使用 <code>httptest.Server</code>，不得访问真实网络。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 9: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 9: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/llm
+<span class="kw">go</span> vet ./internal/llm</code></pre>
+<p>真实 API 验证：在 <code>.env</code> 中配置 OpenAI 或 DeepSeek key，运行 live test 或最小 CLI 请求；输出需要打印 provider、model、base_url、api_style 和截断后的响应摘要，禁止打印完整 key。</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+RUN_LIVE_LLM=1 <span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/llm -run TestLive -v</code></pre>
+<p>Expected: OpenAI GPT-5.5 和 DeepSeek V4 Flash 至少各有一次真实请求成功；失败时错误消息包含 HTTP status、provider 和 model，方便定位配置问题。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 10: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/<span class="kw">go</span>.mod <span class="kw">go</span>-agent/<span class="kw">go</span>.sum <span class="kw">go</span>-agent/internal/llm
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add multi-provider llm clients&quot;</span></code></pre>

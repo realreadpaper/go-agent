@@ -241,7 +241,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: <code>.tasks/task_1.json</code> 等文件存在；依赖完成后自动解锁。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖任务创建、依赖阻塞、状态流转和磁盘恢复：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/tasks ./internal/tools
+<span class="kw">go</span> vet ./internal/tasks</code></pre>
+<p>真实模型验证要创建一个带依赖的任务图，完成前置任务后再观察后续任务解锁：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s07-task-system <span class="str">&quot;Create three tasks: design API, implement API blocked by design, write tests blocked by implement. Mark design done and show which tasks are ready.&quot;</span></code></pre>
+<p>Expected: <code>.tasks/</code> 中有独立 JSON 文件；被阻塞任务不会被列为 ready，依赖完成后状态可被重新计算。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/tasks <span class="kw">go</span>-agent/cmd/s07-task-system
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add persistent task graph&quot;</span></code></pre>

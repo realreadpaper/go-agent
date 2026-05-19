@@ -252,7 +252,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: shutdown request 有 request_id，状态从 pending 到 approved/rejected。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖 request id、pending/approved/rejected 状态机和 inbox 事件顺序：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/protocols ./internal/team
+<span class="kw">go</span> vet ./internal/protocols ./internal/team</code></pre>
+<p>真实模型验证要发起一次 shutdown request，并让目标队友批准或拒绝：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s10-team-protocols <span class="str">&quot;Spawn alice, request alice to shut down with a reason, then approve the request and show the final request status.&quot;</span></code></pre>
+<p>Expected: request 有稳定 <code>request_id</code>；状态先是 <code>pending</code>，随后变为 <code>approved</code> 或 <code>rejected</code>，并写入对应 JSONL。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/protocols <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/cmd/s10-team-protocols
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add team request protocols&quot;</span></code></pre>

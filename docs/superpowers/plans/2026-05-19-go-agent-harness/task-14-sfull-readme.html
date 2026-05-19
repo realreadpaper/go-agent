@@ -239,17 +239,7 @@ AGENT_MODEL=gpt-5.5 \
 OPENAI_API_KEY=... \
 <span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
 
-<ul><li>DeepSeek V4 Pro 快速开始：</li></ul>
-
-<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
-AGENT_LLM_PROVIDER=deepseek \
-AGENT_LLM_API_STYLE=anthropic_messages \
-AGENT_MODEL=deepseek-v4-pro \
-DEEPSEEK_API_KEY=... \
-DEEPSEEK_BASE_URL=https://api.deepseek.com/anthropic \
-<span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
-
-<ul><li>DeepSeek V4 Flash 快速开始：</li></ul>
+<ul><li>DeepSeek V4 Flash 默认快速开始：</li></ul>
 
 <pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
 AGENT_LLM_PROVIDER=deepseek \
@@ -259,8 +249,18 @@ DEEPSEEK_API_KEY=... \
 DEEPSEEK_BASE_URL=https://api.deepseek.com \
 <span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
 
-<ul><li>Provider 快速开始：OpenAI GPT-5.5、DeepSeek V4 Pro、DeepSeek V4 Flash。</li>
-<li>API style 选择建议：OpenAI 默认 Responses；DeepSeek 默认 Anthropic-compatible。</li>
+<ul><li>DeepSeek V4 Pro 可选快速开始：</li></ul>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+AGENT_LLM_PROVIDER=deepseek \
+AGENT_LLM_API_STYLE=anthropic_messages \
+AGENT_MODEL=deepseek-v4-pro \
+DEEPSEEK_API_KEY=... \
+DEEPSEEK_BASE_URL=https://api.deepseek.com/anthropic \
+<span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
+
+<ul><li>Provider 快速开始：OpenAI GPT-5.5、DeepSeek V4 Flash、DeepSeek V4 Pro（可选）。</li>
+<li>API style 选择建议：OpenAI 默认 Responses；DeepSeek 默认 OpenAI-compatible Chat，V4 Pro 可选 Anthropic-compatible。</li>
 <li>Tool calling 映射说明：OpenAI <code>function_call</code> / Chat <code>tool_calls</code> / Anthropic <code>tool_use</code> 如何统一到内部 block。</li>
 <li>故障排查：401、404、unsupported model、tool schema rejected、reasoning items 未回传、DeepSeek unsupported field ignored。</li>
 <li>安全声明：OpenAI hosted tools 不启用，本项目只执行本地 harness tools。</li></ul>
@@ -283,7 +283,20 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com \
 <p>Expected: 全部 PASS。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>最终任务必须同时验证完整编译、并发 race、README 可操作性和真实模型 smoke：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./...
+<span class="kw">go</span> <span class="kw">test</span> -race ./internal/background ./internal/team ./internal/autonomous
+<span class="kw">go</span> vet ./...</code></pre>
+<p>真实模型 smoke 至少跑三条：基础文件工具、任务图、团队或 worktree。每条都要记录命令、provider、model 和关键输出摘要：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/sfull <span class="str">&quot;Create tmp/full-demo.txt, read it back, create one task, then show /tasks.&quot;</span></code></pre>
+<p>Expected: <code>sfull</code> 能启动并执行 REPL/单次 prompt；README 中的每个命令都能对应到 <code>cmd/s01</code> 到 <code>cmd/s12</code> 或 <code>cmd/sfull</code>。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/cmd/sfull <span class="kw">go</span>-agent/README.md <span class="kw">go</span>-agent/internal/integration
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add full harness demo&quot;</span></code></pre>

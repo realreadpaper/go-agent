@@ -238,7 +238,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 测试 PASS；父上下文只记录 task 的摘要结果。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要确认父子 agent 的 messages 隔离和禁止递归 task：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/subagent ./internal/agent ./internal/tools
+<span class="kw">go</span> vet ./internal/subagent ./internal/agent</code></pre>
+<p>真实模型验证让父 agent 派发一次调查任务，最终回答只能包含摘要，而不是子 agent 的完整工具调用流水：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s04-subagent <span class="str">&quot;Use a subagent to inspect the repository layout, then summarize only the important directories.&quot;</span></code></pre>
+<p>Expected: 调试输出能看到父 agent 调用 <code>task</code>；最终回答是目录摘要，父 transcript 中不应塞入子 agent 读取的所有中间文件内容。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/subagent <span class="kw">go</span>-agent/cmd/s04-subagent
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add subagent runner&quot;</span></code></pre>

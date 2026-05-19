@@ -246,7 +246,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 测试 PASS；运行命令时如未配置 API key，打印清晰错误。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>先跑无网络回归，确认 loop、hook、bash 工具和 provider adapter 都能编译通过：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./...
+<span class="kw">go</span> vet ./...</code></pre>
+<p>再用真实模型验证 agent loop 能完成一次工具调用闭环。这个 prompt 必须迫使模型调用 <code>bash</code>，不能只靠模型常识回答：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;What is the current git branch? Use bash.&quot;</span></code></pre>
+<p>Expected: 输出包含当前分支名；调试日志能看出至少一次 <code>tool_use:bash</code> 和一次 <code>tool_result</code>。如果 API key 缺失，程序应明确提示缺少哪个环境变量。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/agent <span class="kw">go</span>-agent/internal/tools <span class="kw">go</span>-agent/cmd/s01-agent-loop
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): implement s01 agent loop&quot;</span></code></pre>

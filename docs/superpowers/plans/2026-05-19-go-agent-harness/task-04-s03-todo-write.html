@@ -239,7 +239,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 测试 PASS；nag hook 单测可验证 reminder 注入。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要证明 todo 状态校验和 nag hook 都可测试：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/todo ./internal/agent ./internal/tools
+<span class="kw">go</span> vet ./internal/todo ./internal/agent</code></pre>
+<p>真实模型验证要使用一个明确的多步任务，观察模型是否先写 todo、只保留一个 <code>in_progress</code>，并在完成后更新状态：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s03-todo-write <span class="str">&quot;Create tmp/todo-demo.txt, write three short lines, read it back, and keep your todo list updated.&quot;</span></code></pre>
+<p>Expected: 输出中出现 todo 列表从 <code>[ ]</code> 到 <code>[&gt;]</code> 再到 <code>[x]</code> 的变化；连续不更新 todo 时能观察到 reminder 注入。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/todo <span class="kw">go</span>-agent/internal/agent <span class="kw">go</span>-agent/cmd/s03-todo-write
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add todo planning tool&quot;</span></code></pre>

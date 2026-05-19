@@ -235,7 +235,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 模型可在后台命令运行期间继续调用其他工具。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要重点跑并发和 race，确认后台任务状态不会数据竞争：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/background ./internal/agent
+<span class="kw">go</span> <span class="kw">test</span> -race ./internal/background</code></pre>
+<p>真实模型验证要启动一个短后台命令，在它运行时继续执行文件读取或任务查询：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s08-background-tasks <span class="str">&quot;Start a background command that sleeps 2 seconds then prints done. While it runs, list files, then poll background notifications.&quot;</span></code></pre>
+<p>Expected: agent 不会阻塞在 sleep 上；通知队列最终出现 completed 事件，后台 stdout/stderr 可被查看。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/background <span class="kw">go</span>-agent/cmd/s08-background-tasks
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add background command runner&quot;</span></code></pre>

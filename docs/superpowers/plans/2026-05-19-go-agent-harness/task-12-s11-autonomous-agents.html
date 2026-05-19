@@ -240,7 +240,19 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 队友能从 <code>.tasks/</code> 自动认领任务。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖 ready task 扫描、自动认领、阻塞任务跳过和 idle timeout：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/autonomous ./internal/tasks ./internal/team
+<span class="kw">go</span> <span class="kw">test</span> -race ./internal/autonomous ./internal/team</code></pre>
+<p>真实模型验证要准备多个任务和队友，观察空闲队友自动认领未阻塞任务：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s11-autonomous-agents <span class="str">&quot;Create three ready tasks, spawn alice and bob, let them enter idle mode, then show which tasks they auto-claimed.&quot;</span></code></pre>
+<p>Expected: 任务 owner 写入队友名，状态变为 <code>in_progress</code>；有 blockedBy 的任务不会被自动认领。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/autonomous <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/internal/tasks <span class="kw">go</span>-agent/cmd/s11-autonomous-agents
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add autonomous task claiming&quot;</span></code></pre>

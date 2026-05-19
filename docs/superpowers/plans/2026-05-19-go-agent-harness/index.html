@@ -263,7 +263,6 @@ li { margin: 4px 0; color: var(--text-muted); }
     llm/openai_chat.go
     llm/anthropic_compat.go
     llm/deepseek.go
-    llm/fake.go
     tools/registry.go
     tools/base.go
     tools/schema.go
@@ -499,9 +498,10 @@ li { margin: 4px 0; color: var(--text-muted); }
 <thead><tr><th>Provider</th><th>默认 model</th><th>默认 API style</th><th>base URL</th></tr></thead>
 <tbody>
 <tr><td><code>openai</code></td><td><code>gpt-5.5</code></td><td><code>openai_responses</code></td><td><code>https://api.openai.com</code></td></tr>
-<tr><td><code>deepseek</code></td><td><code>deepseek-v4-pro</code></td><td><code>anthropic_messages</code></td><td><code>https://api.deepseek.com/anthropic</code></td></tr>
 <tr><td><code>deepseek</code></td><td><code>deepseek-v4-flash</code></td><td><code>openai_chat</code></td><td><code>https://api.deepseek.com</code></td></tr>
 </tbody></table></div>
+
+<p><code>deepseek-v4-pro</code> 可作为可选高能力模型，通过 <code>anthropic_messages</code> 和 <code>https://api.deepseek.com/anthropic</code> 验证；默认教学路径使用 <code>deepseek-v4-flash</code>。</p>
 
 
 <hr>
@@ -543,6 +543,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <li>README 能把每个 Go cmd 映射回中文文档 s01-s12。</li>
 <li><code>internal/llm</code> 覆盖 OpenAI Responses、OpenAI Chat、DeepSeek Anthropic-compatible、DeepSeek OpenAI-compatible 的无网络 adapter tests。</li></ul>
 </div><div id="section-task-01-llm-abstraction.html" class="section">
+
 <h1>Task 1: 初始化 Go 项目与 LLM 抽象</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> 无</p></blockquote>
@@ -557,13 +558,13 @@ li { margin: 4px 0; color: var(--text-muted); }
 <ul><li><strong>Message：</strong>对话历史中的一条记录。用户输入、助手回复、工具结果都会变成 message，agent loop 靠它们让模型知道刚才发生了什么。</li>
 <li><strong>ToolSpec：</strong>告诉模型“有哪些工具可以用、参数长什么样”。模型不会真的执行工具，它只会输出一个结构化的 tool call。</li>
 <li><strong>Response：</strong>模型返回的内容，可能是普通文本，也可能是 tool_use。后续循环会根据 <code>stop_reason</code> 决定是否执行工具。</li>
-<li><strong>FakeClient：</strong>测试用的假模型。它让我们不用真实 API key，也能验证 loop、工具分发和状态机。</li></ul>
+<li><strong>Scripted test client：</strong>测试用的脚本化模型。业务包可以在自己的测试里实现最小 fake，不需要把 fake provider 放进生产 <code>internal/llm</code>。</li></ul>
 
 <h3>为什么这样拆</h3>
 <p><code>internal/llm</code> 只负责协议转换，不知道 agent、任务、文件系统或团队协作。这样后续从 OpenAI Responses 换成 OpenAI-compatible Chat 或 DeepSeek adapter 时，agent 主流程不需要改。第一次读代码时，可以把这层看成“模型插座”：外面接不同 provider，里面统一输出 Go 结构体。</p>
 
 <h3>完成后应该理解</h3>
-<p>你应该能解释一次 LLM 调用需要哪些输入、模型如何表达“我要调用工具”、为什么业务测试必须依赖 fake client，以及为什么 provider adapter 不能执行工具。</p>
+<p>你应该能解释一次 LLM 调用需要哪些输入、模型如何表达“我要调用工具”、为什么业务测试要避免真实网络，以及为什么 provider adapter 不能执行工具。</p>
 
 <hr>
 
@@ -576,8 +577,6 @@ li { margin: 4px 0; color: var(--text-muted); }
 <li>Create: <code>go-agent/internal/llm/openai_chat.go</code></li>
 <li>Create: <code>go-agent/internal/llm/anthropic_compat.go</code></li>
 <li>Create: <code>go-agent/internal/llm/deepseek.go</code></li>
-<li>Create: <code>go-agent/internal/llm/fake.go</code></li>
-<li>Test: <code>go-agent/internal/llm/fake_test.go</code></li>
 <li>Test: <code>go-agent/internal/llm/config_test.go</code></li>
 <li>Test: <code>go-agent/internal/llm/openai_responses_test.go</code></li>
 <li>Test: <code>go-agent/internal/llm/openai_chat_test.go</code></li>
@@ -598,24 +597,23 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: <code>go.mod</code> 存在，module 为 <code>learn-claude-code-go</code>。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 写 <code>llm</code> 类型、配置解析与 fake client 测试**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 写 <code>llm</code> 类型、配置解析与配置测试**</span>
 <div class="step-detail">
 <p>类型定义见 overview 核心数据模型中的 <code>internal/llm/types.go</code> 和 <code>internal/llm/config.go</code>。</p>
 
 <p>测试覆盖：</p>
-<ul><li><code>FakeClient</code> 按顺序返回预设响应；响应耗尽时返回错误。</li>
-<li><code>DefaultConfigFromEnv()</code> 可解析 OpenAI GPT-5.5：</li></ul>
+<ul><li><code>DefaultConfigFromEnv()</code> 可解析 OpenAI GPT-5.5：</li></ul>
 
 <pre><code class="lang-bash">AGENT_LLM_PROVIDER=openai
 AGENT_LLM_API_STYLE=openai_responses
 AGENT_MODEL=gpt-5.5
 OPENAI_API_KEY=<span class="kw">test</span>-key</code></pre>
 
-<ul><li><code>DefaultConfigFromEnv()</code> 可解析 DeepSeek V4 Pro：</li></ul>
+<ul><li><code>DefaultConfigFromEnv()</code> 可解析 DeepSeek V4 Flash：</li></ul>
 
 <pre><code class="lang-bash">AGENT_LLM_PROVIDER=deepseek
-AGENT_LLM_API_STYLE=anthropic_messages
-AGENT_MODEL=deepseek-v4-pro
+AGENT_LLM_API_STYLE=openai_chat
+AGENT_MODEL=deepseek-v4-flash
 DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 
 <ul><li>缺少 provider 对应 API key 时返回清晰错误。</li></ul>
@@ -702,9 +700,9 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>要求：</p>
 <ul><li><code>Provider=deepseek</code> 且 <code>APIStyle=anthropic_messages</code> 时创建 <code>AnthropicCompatClient</code>。</li>
 <li><code>Provider=deepseek</code> 且 <code>APIStyle=openai_chat</code> 时创建 <code>OpenAIChatClient</code>。</li>
-<li>默认模型为 <code>deepseek-v4-pro</code>。</li>
-<li>默认 API style 为 <code>anthropic_messages</code>。</li>
-<li><code>deepseek-v4-flash</code> 作为 README 中的低成本示例，不作为默认值。</li></ul>
+<li>默认模型为 <code>deepseek-v4-flash</code>。</li>
+<li>默认 API style 为 <code>openai_chat</code>。</li>
+<li><code>deepseek-v4-pro</code> 可以作为 README 中的高能力示例，但不作为默认值。</li></ul>
 </div>
 </div>
 <div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 实现 client factory**</span>
@@ -729,13 +727,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: PASS。测试使用 <code>httptest.Server</code>，不得访问真实网络。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 9: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 9: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/llm
+<span class="kw">go</span> vet ./internal/llm</code></pre>
+<p>真实 API 验证：在 <code>.env</code> 中配置 OpenAI 或 DeepSeek key，运行 live test 或最小 CLI 请求；输出需要打印 provider、model、base_url、api_style 和截断后的响应摘要，禁止打印完整 key。</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+RUN_LIVE_LLM=1 <span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/llm -run TestLive -v</code></pre>
+<p>Expected: OpenAI GPT-5.5 和 DeepSeek V4 Flash 至少各有一次真实请求成功；失败时错误消息包含 HTTP status、provider 和 model，方便定位配置问题。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 10: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/<span class="kw">go</span>.mod <span class="kw">go</span>-agent/<span class="kw">go</span>.sum <span class="kw">go</span>-agent/internal/llm
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add multi-provider llm clients&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-02-s01-agent-loop.html" class="section">
+
 <h1>Task 2: 实现 s01 agent loop 和 bash 工具</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 1 (LLM 抽象层)</p></blockquote>
@@ -824,13 +836,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: 测试 PASS；运行命令时如未配置 API key，打印清晰错误。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>先跑无网络回归，确认 loop、hook、bash 工具和 provider adapter 都能编译通过：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./...
+<span class="kw">go</span> vet ./...</code></pre>
+<p>再用真实模型验证 agent loop 能完成一次工具调用闭环。这个 prompt 必须迫使模型调用 <code>bash</code>，不能只靠模型常识回答：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;What is the current git branch? Use bash.&quot;</span></code></pre>
+<p>Expected: 输出包含当前分支名；调试日志能看出至少一次 <code>tool_use:bash</code> 和一次 <code>tool_result</code>。如果 API key 缺失，程序应明确提示缺少哪个环境变量。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/agent <span class="kw">go</span>-agent/internal/tools <span class="kw">go</span>-agent/cmd/s01-agent-loop
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): implement s01 agent loop&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-03-s02-tool-use.html" class="section">
+
 <h1>Task 3: 实现 s02 工具分发、文件工具和路径沙箱</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop + registry)</p></blockquote>
@@ -895,13 +921,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: 测试 PASS；CLI 可让模型调用文件工具。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖路径沙箱和文件工具稳定输出：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/tools ./internal/agent
+<span class="kw">go</span> vet ./internal/tools ./internal/agent</code></pre>
+<p>真实模型验证要让模型依次写文件、读文件、编辑文件，并确认 <code>../</code> 逃逸会被拒绝：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s02-tool-use <span class="str">&quot;Create tmp/greet.go with a greet function, read it, edit it to add a Chinese comment, then try to read ../outside.txt and report the sandbox error.&quot;</span></code></pre>
+<p>Expected: <code>tmp/greet.go</code> 存在且内容被编辑；输出中能看到 <code>read_file</code>、<code>write_file</code>、<code>edit_file</code> 的调用结果，以及路径逃逸错误。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/tools <span class="kw">go</span>-agent/cmd/s02-tool-use
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add file tools and dispatch&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-04-s03-todo-write.html" class="section">
+
 <h1>Task 4: 实现 s03 TodoWrite 和 nag reminder</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 3 (文件工具)</p></blockquote>
@@ -983,13 +1023,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: 测试 PASS；nag hook 单测可验证 reminder 注入。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要证明 todo 状态校验和 nag hook 都可测试：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/todo ./internal/agent ./internal/tools
+<span class="kw">go</span> vet ./internal/todo ./internal/agent</code></pre>
+<p>真实模型验证要使用一个明确的多步任务，观察模型是否先写 todo、只保留一个 <code>in_progress</code>，并在完成后更新状态：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s03-todo-write <span class="str">&quot;Create tmp/todo-demo.txt, write three short lines, read it back, and keep your todo list updated.&quot;</span></code></pre>
+<p>Expected: 输出中出现 todo 列表从 <code>[ ]</code> 到 <code>[&gt;]</code> 再到 <code>[x]</code> 的变化；连续不更新 todo 时能观察到 reminder 注入。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/todo <span class="kw">go</span>-agent/internal/agent <span class="kw">go</span>-agent/cmd/s03-todo-write
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add todo planning tool&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-05-s04-subagent.html" class="section">
+
 <h1>Task 5: 实现 s04 Subagent</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop + registry)</p></blockquote>
@@ -1070,13 +1124,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: 测试 PASS；父上下文只记录 task 的摘要结果。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要确认父子 agent 的 messages 隔离和禁止递归 task：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/subagent ./internal/agent ./internal/tools
+<span class="kw">go</span> vet ./internal/subagent ./internal/agent</code></pre>
+<p>真实模型验证让父 agent 派发一次调查任务，最终回答只能包含摘要，而不是子 agent 的完整工具调用流水：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s04-subagent <span class="str">&quot;Use a subagent to inspect the repository layout, then summarize only the important directories.&quot;</span></code></pre>
+<p>Expected: 调试输出能看到父 agent 调用 <code>task</code>；最终回答是目录摘要，父 transcript 中不应塞入子 agent 读取的所有中间文件内容。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/subagent <span class="kw">go</span>-agent/cmd/s04-subagent
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add subagent runner&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-06-s05-skill-loading.html" class="section">
+
 <h1>Task 6: 实现 s05 Skill 加载</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 3 (文件工具和路径沙箱)</p></blockquote>
@@ -1153,13 +1221,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: 测试 PASS；CLI 能列出可用 skill。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖 skill 发现、frontmatter 解析、触发规则和缺失文件错误：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/skills ./internal/tools
+<span class="kw">go</span> vet ./internal/skills</code></pre>
+<p>真实模型验证要让模型先列 skill，再加载一个本地 skill，并在回答中说明它使用了哪条本地规则：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s05-skill-loading <span class="str">&quot;List available skills, load the git-commit skill if present, and summarize its commit safety rules in Chinese.&quot;</span></code></pre>
+<p>Expected: 输出包含 skill 名称、路径和中文规则摘要；不存在的 skill 应返回清晰错误而不是 panic。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/skills <span class="kw">go</span>-agent/skills <span class="kw">go</span>-agent/cmd/s05-skill-loading <span class="kw">go</span>-agent/<span class="kw">go</span>.mod <span class="kw">go</span>-agent/<span class="kw">go</span>.sum
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add on-demand skill loading&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-07-s06-context-compact.html" class="section">
+
 <h1>Task 7: 实现 s06 上下文压缩</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop)</p></blockquote>
@@ -1233,13 +1315,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: 测试 PASS；<code>.transcripts/</code> 写入 JSONL。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要确认压缩前后消息数量、摘要内容和 transcript 落盘：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/compact ./internal/agent
+<span class="kw">go</span> vet ./internal/compact</code></pre>
+<p>真实模型验证要先制造一段较长对话，再手动触发 compact，随后要求模型继续使用压缩摘要回答：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s06-context-compact <span class="str">&quot;Create a short project note, read it, compact the context, then explain what survived in the summary.&quot;</span></code></pre>
+<p>Expected: <code>.transcripts/</code> 下出现 JSONL；压缩后 messages 中保留摘要和最近关键消息，模型仍能说出压缩前的重要事实。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/compact <span class="kw">go</span>-agent/cmd/s06-context-compact
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add context compaction&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-08-s07-task-system.html" class="section">
+
 <h1>Task 8: 实现 s07 持久任务图</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop)</p></blockquote>
@@ -1323,13 +1419,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: <code>.tasks/task_1.json</code> 等文件存在；依赖完成后自动解锁。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖任务创建、依赖阻塞、状态流转和磁盘恢复：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/tasks ./internal/tools
+<span class="kw">go</span> vet ./internal/tasks</code></pre>
+<p>真实模型验证要创建一个带依赖的任务图，完成前置任务后再观察后续任务解锁：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s07-task-system <span class="str">&quot;Create three tasks: design API, implement API blocked by design, write tests blocked by implement. Mark design done and show which tasks are ready.&quot;</span></code></pre>
+<p>Expected: <code>.tasks/</code> 中有独立 JSON 文件；被阻塞任务不会被列为 ready，依赖完成后状态可被重新计算。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/tasks <span class="kw">go</span>-agent/cmd/s07-task-system
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add persistent task graph&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-09-s08-background-tasks.html" class="section">
+
 <h1>Task 9: 实现 s08 后台任务</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop)</p></blockquote>
@@ -1407,13 +1517,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: 模型可在后台命令运行期间继续调用其他工具。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要重点跑并发和 race，确认后台任务状态不会数据竞争：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/background ./internal/agent
+<span class="kw">go</span> <span class="kw">test</span> -race ./internal/background</code></pre>
+<p>真实模型验证要启动一个短后台命令，在它运行时继续执行文件读取或任务查询：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s08-background-tasks <span class="str">&quot;Start a background command that sleeps 2 seconds then prints done. While it runs, list files, then poll background notifications.&quot;</span></code></pre>
+<p>Expected: agent 不会阻塞在 sleep 上；通知队列最终出现 completed 事件，后台 stdout/stderr 可被查看。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/background <span class="kw">go</span>-agent/cmd/s08-background-tasks
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add background command runner&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-10-s09-agent-teams.html" class="section">
+
 <h1>Task 10: 实现 s09 团队邮箱与持久队友</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop)</p></blockquote>
@@ -1503,13 +1627,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: <code>.team/config.json</code> 和 <code>.team/inbox/*.jsonl</code> 可观察。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖队友配置、inbox JSONL、消息投递和 goroutine 生命周期：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/team ./internal/background
+<span class="kw">go</span> <span class="kw">test</span> -race ./internal/team</code></pre>
+<p>真实模型验证要创建两个队友，互发一条状态消息，并读取 inbox：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s09-agent-teams <span class="str">&quot;Spawn alice as coder and bob as reviewer. Send bob a message asking for status, then show bob's inbox.&quot;</span></code></pre>
+<p>Expected: <code>.team/config.json</code> 记录队友；<code>.team/inbox/bob.jsonl</code> 出现消息；停止队友后 goroutine 能退出。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/cmd/s09-agent-teams
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add persistent agent teams&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-11-s10-team-protocols.html" class="section">
+
 <h1>Task 11: 实现 s10 request-response 团队协议</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 10 (团队邮箱与持久队友)</p></blockquote>
@@ -1604,13 +1742,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: shutdown request 有 request_id，状态从 pending 到 approved/rejected。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖 request id、pending/approved/rejected 状态机和 inbox 事件顺序：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/protocols ./internal/team
+<span class="kw">go</span> vet ./internal/protocols ./internal/team</code></pre>
+<p>真实模型验证要发起一次 shutdown request，并让目标队友批准或拒绝：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s10-team-protocols <span class="str">&quot;Spawn alice, request alice to shut down with a reason, then approve the request and show the final request status.&quot;</span></code></pre>
+<p>Expected: request 有稳定 <code>request_id</code>；状态先是 <code>pending</code>，随后变为 <code>approved</code> 或 <code>rejected</code>，并写入对应 JSONL。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/protocols <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/cmd/s10-team-protocols
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add team request protocols&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-12-s11-autonomous-agents.html" class="section">
+
 <h1>Task 12: 实现 s11 自主队友</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 10 (团队邮箱), Task 8 (持久任务图)</p></blockquote>
@@ -1693,13 +1845,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: 队友能从 <code>.tasks/</code> 自动认领任务。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要覆盖 ready task 扫描、自动认领、阻塞任务跳过和 idle timeout：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/autonomous ./internal/tasks ./internal/team
+<span class="kw">go</span> <span class="kw">test</span> -race ./internal/autonomous ./internal/team</code></pre>
+<p>真实模型验证要准备多个任务和队友，观察空闲队友自动认领未阻塞任务：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s11-autonomous-agents <span class="str">&quot;Create three ready tasks, spawn alice and bob, let them enter idle mode, then show which tasks they auto-claimed.&quot;</span></code></pre>
+<p>Expected: 任务 owner 写入队友名，状态变为 <code>in_progress</code>；有 blockedBy 的任务不会被自动认领。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/autonomous <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/internal/tasks <span class="kw">go</span>-agent/cmd/s11-autonomous-agents
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add autonomous task claiming&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-13-s12-worktree-isolation.html" class="section">
+
 <h1>Task 13: 实现 s12 worktree 任务隔离</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 8 (持久任务图)</p></blockquote>
@@ -1807,13 +1973,27 @@ DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
 <p>Expected: 任务与 worktree 双向绑定；remove 可同时完成任务并移除 worktree。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>无网络验证要在临时 git 仓库里跑，确认不会污染当前工作区：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./internal/worktree ./internal/tasks
+<span class="kw">go</span> vet ./internal/worktree ./internal/tasks</code></pre>
+<p>真实 CLI 验证要在一个干净 git 仓库中创建 worktree、运行命令、保留或移除 worktree：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/s12-worktree-task-isolation <span class="str">&quot;Create task 1 if needed, create worktree auth-refactor for it, run git status inside that worktree, then list worktree events.&quot;</span></code></pre>
+<p>Expected: <code>.worktrees/index.json</code> 和 <code>.worktrees/events.jsonl</code> 可观察；<code>worktree_run</code> 的 cwd 是隔离 worktree，不是主仓库。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/worktree <span class="kw">go</span>-agent/cmd/s12-worktree-task-isolation
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add worktree task isolation&quot;</span></code></pre>
 </div>
 </div>
+
 </div><div id="section-task-14-sfull-readme.html" class="section">
+
 <h1>Task 14: 实现 capstone <code>sfull</code> 与 README</h1>
 
 <blockquote><p><strong>Prerequisites:</strong> Task 1-13 全部完成</p></blockquote>
@@ -1895,17 +2075,7 @@ AGENT_MODEL=gpt-5.5 \
 OPENAI_API_KEY=... \
 <span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
 
-<ul><li>DeepSeek V4 Pro 快速开始：</li></ul>
-
-<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
-AGENT_LLM_PROVIDER=deepseek \
-AGENT_LLM_API_STYLE=anthropic_messages \
-AGENT_MODEL=deepseek-v4-pro \
-DEEPSEEK_API_KEY=... \
-DEEPSEEK_BASE_URL=https://api.deepseek.com/anthropic \
-<span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
-
-<ul><li>DeepSeek V4 Flash 快速开始：</li></ul>
+<ul><li>DeepSeek V4 Flash 默认快速开始：</li></ul>
 
 <pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
 AGENT_LLM_PROVIDER=deepseek \
@@ -1915,8 +2085,18 @@ DEEPSEEK_API_KEY=... \
 DEEPSEEK_BASE_URL=https://api.deepseek.com \
 <span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
 
-<ul><li>Provider 快速开始：OpenAI GPT-5.5、DeepSeek V4 Pro、DeepSeek V4 Flash。</li>
-<li>API style 选择建议：OpenAI 默认 Responses；DeepSeek 默认 Anthropic-compatible。</li>
+<ul><li>DeepSeek V4 Pro 可选快速开始：</li></ul>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+AGENT_LLM_PROVIDER=deepseek \
+AGENT_LLM_API_STYLE=anthropic_messages \
+AGENT_MODEL=deepseek-v4-pro \
+DEEPSEEK_API_KEY=... \
+DEEPSEEK_BASE_URL=https://api.deepseek.com/anthropic \
+<span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
+
+<ul><li>Provider 快速开始：OpenAI GPT-5.5、DeepSeek V4 Flash、DeepSeek V4 Pro（可选）。</li>
+<li>API style 选择建议：OpenAI 默认 Responses；DeepSeek 默认 OpenAI-compatible Chat，V4 Pro 可选 Anthropic-compatible。</li>
 <li>Tool calling 映射说明：OpenAI <code>function_call</code> / Chat <code>tool_calls</code> / Anthropic <code>tool_use</code> 如何统一到内部 block。</li>
 <li>故障排查：401、404、unsupported model、tool schema rejected、reasoning items 未回传、DeepSeek unsupported field ignored。</li>
 <li>安全声明：OpenAI hosted tools 不启用，本项目只执行本地 harness tools。</li></ul>
@@ -1939,12 +2119,26 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com \
 <p>Expected: 全部 PASS。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="step-detail">
+<p>最终任务必须同时验证完整编译、并发 race、README 可操作性和真实模型 smoke：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> -count=1 ./...
+<span class="kw">go</span> <span class="kw">test</span> -race ./internal/background ./internal/team ./internal/autonomous
+<span class="kw">go</span> vet ./...</code></pre>
+<p>真实模型 smoke 至少跑三条：基础文件工具、任务图、团队或 worktree。每条都要记录命令、provider、model 和关键输出摘要：</p>
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> run ./cmd/sfull <span class="str">&quot;Create tmp/full-demo.txt, read it back, create one task, then show /tasks.&quot;</span></code></pre>
+<p>Expected: <code>sfull</code> 能启动并执行 REPL/单次 prompt；README 中的每个命令都能对应到 <code>cmd/s01</code> 到 <code>cmd/s12</code> 或 <code>cmd/sfull</code>。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/cmd/sfull <span class="kw">go</span>-agent/README.md <span class="kw">go</span>-agent/internal/integration
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add full harness demo&quot;</span></code></pre>
 </div>
 </div>
+
 </div>
 </main>
 <script>
