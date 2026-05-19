@@ -115,6 +115,40 @@ func TestOpenAIResponsesClientParsesFunctionCallAsToolUse(t *testing.T) {
 	}
 }
 
+func TestOpenAIResponsesClientStoresRawBodyOnlyWhenTraceRawAPIEnabled(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"output_text":"hello"}`))
+	}))
+	defer server.Close()
+
+	withoutTrace := NewOpenAIResponsesClient(Config{
+		Model:   "gpt-test",
+		APIKey:  "test-key",
+		BaseURL: server.URL,
+	}, server.Client())
+	resp, err := withoutTrace.Create(Request{Messages: []Message{{Role: "user", Content: "hi"}}})
+	if err != nil {
+		t.Fatalf("Create without trace returned error: %v", err)
+	}
+	if resp.RawBody != "" {
+		t.Fatalf("RawBody without trace = %q, want empty", resp.RawBody)
+	}
+
+	withTrace := NewOpenAIResponsesClient(Config{
+		Model:       "gpt-test",
+		APIKey:      "test-key",
+		BaseURL:     server.URL,
+		TraceRawAPI: true,
+	}, server.Client())
+	resp, err = withTrace.Create(Request{Messages: []Message{{Role: "user", Content: "hi"}}})
+	if err != nil {
+		t.Fatalf("Create with trace returned error: %v", err)
+	}
+	if resp.RawBody != `{"output_text":"hello"}` {
+		t.Fatalf("RawBody with trace = %q", resp.RawBody)
+	}
+}
+
 func TestOpenAIResponsesClientSendsFunctionCallOutputForToolResults(t *testing.T) {
 	var gotRequest map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

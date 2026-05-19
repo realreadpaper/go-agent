@@ -38,7 +38,8 @@ func (c *OpenAIChatClient) Create(req Request) (Response, error) {
 	if err != nil {
 		return Response{}, err
 	}
-	return parseOpenAIChat(raw)
+	resp, err := parseOpenAIChat(raw)
+	return withRawBody(resp, raw, c.cfg.TraceRawAPI), err
 }
 
 func (c *OpenAIChatClient) endpointPath() string {

@@ -51,6 +51,7 @@ func TestLoopWritesTraceForRoundsAndToolCalls(t *testing.T) {
 		{
 			StopReason: "end_turn",
 			Content:    []llm.ContentBlock{{Type: "text", Text: "main"}},
+			RawBody:    `{"output_text":"main"}`,
 		},
 	}}
 	tools := &scriptedTools{outputs: map[string]string{"bash": "main\n"}}
@@ -75,6 +76,42 @@ func TestLoopWritesTraceForRoundsAndToolCalls(t *testing.T) {
 		"tool_result name=bash chars=5",
 		"[agent] round=2",
 		"stop_reason=end_turn",
+		"content[0] type=text text=\"main\"",
+		"raw_api={\"output_text\":\"main\"}",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("trace output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestLoopTracePrintsNormalizedResponseAndRedactsRawAPI(t *testing.T) {
+	secret := "sk-" + "testsecret1234567890"
+	client := &scriptedClient{responses: []llm.Response{
+		{
+			StopReason: "end_turn",
+			Content: []llm.ContentBlock{{
+				Type: "text",
+				Text: "token " + secret,
+			}},
+			RawBody: `{"text":"OPENAI_API_KEY=` + secret + `"}`,
+		},
+	}}
+	var trace bytes.Buffer
+	loop := &Loop{Client: client, Trace: &trace}
+
+	_, _, err := loop.Run([]llm.Message{{Role: "user", Content: "secret"}})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	out := trace.String()
+	if strings.Contains(out, secret) {
+		t.Fatalf("trace output leaked secret:\n%s", out)
+	}
+	for _, want := range []string{
+		"content[0] type=text text=\"token sk-<redacted>\"",
+		"raw_api={\"text\":\"OPENAI_API_KEY=<redacted>\"}",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("trace output missing %q:\n%s", want, out)

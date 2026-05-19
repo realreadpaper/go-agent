@@ -33,6 +33,9 @@ type Config struct {
 	ReasoningEffort string
 	ThinkingEnabled bool
 	Store           bool
+	// TraceRawAPI 只用于调试 provider adapter。
+	// 开启后 Response.RawBody 会携带原始 API body，调用方打印前必须脱敏和截断。
+	TraceRawAPI bool
 }
 
 func DefaultConfigFromEnv() (Config, error) {
@@ -43,6 +46,7 @@ func DefaultConfigFromEnv() (Config, error) {
 		ReasoningEffort: envOr("AGENT_REASONING_EFFORT", "medium"),
 		ThinkingEnabled: boolEnv("AGENT_THINKING_ENABLED", false),
 		Store:           boolEnv("AGENT_STORE", false),
+		TraceRawAPI:     boolEnv("AGENT_TRACE_RAW_API", false),
 	}
 
 	switch provider {

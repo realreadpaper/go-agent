@@ -37,7 +37,7 @@ func main() {
 	}
 	// 调试日志刻意不打印 API key，只打印 provider/model/style/base_url。
 	// 用户看到这些信息就能判断当前到底连的是 OpenAI、DeepSeek 还是兼容服务。
-	fmt.Fprintf(os.Stderr, "[s01] provider=%s api_style=%s model=%s base_url=%s\n", cfg.Provider, cfg.APIStyle, cfg.Model, cfg.BaseURL)
+	fmt.Fprintf(os.Stderr, "[s01] provider=%s api_style=%s model=%s base_url=%s trace_raw_api=%t\n", cfg.Provider, cfg.APIStyle, cfg.Model, cfg.BaseURL, cfg.TraceRawAPI)
 
 	workdir, err := os.Getwd()
 	if err != nil {

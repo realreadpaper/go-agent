@@ -43,7 +43,8 @@ func (c *AnthropicCompatClient) Create(req Request) (Response, error) {
 	if err != nil {
 		return Response{}, err
 	}
-	return parseAnthropic(raw)
+	resp, err := parseAnthropic(raw)
+	return withRawBody(resp, raw, c.cfg.TraceRawAPI), err
 }
 
 func toAnthropicTools(specs []ToolSpec) []map[string]any {

@@ -12,6 +12,7 @@ func clearConfigEnv(t *testing.T) {
 		"AGENT_REASONING_EFFORT",
 		"AGENT_THINKING_ENABLED",
 		"AGENT_STORE",
+		"AGENT_TRACE_RAW_API",
 		"OPENAI_API_KEY",
 		"OPENAI_BASE_URL",
 		"DEEPSEEK_API_KEY",
@@ -53,6 +54,25 @@ func TestDefaultConfigFromEnvParsesOpenAIResponses(t *testing.T) {
 	}
 	if cfg.Store {
 		t.Fatal("Store = true, want false by default")
+	}
+	if cfg.TraceRawAPI {
+		t.Fatal("TraceRawAPI = true, want false by default")
+	}
+}
+
+func TestDefaultConfigFromEnvParsesTraceRawAPI(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("AGENT_LLM_PROVIDER", "openai")
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	t.Setenv("AGENT_TRACE_RAW_API", "1")
+
+	cfg, err := DefaultConfigFromEnv()
+	if err != nil {
+		t.Fatalf("DefaultConfigFromEnv returned error: %v", err)
+	}
+
+	if !cfg.TraceRawAPI {
+		t.Fatal("TraceRawAPI = false, want true")
 	}
 }
 

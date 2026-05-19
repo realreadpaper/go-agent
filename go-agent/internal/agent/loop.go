@@ -85,6 +85,7 @@ func (l *Loop) Run(messages []llm.Message) ([]llm.Message, llm.Response, error) 
 			return messages, resp, err
 		}
 		l.tracef("[agent] response stop_reason=%s blocks=%d\n", resp.StopReason, len(resp.Content))
+		l.traceResponse(resp)
 		// assistant message 必须保留原始 tool_use block。
 		// 下一轮 provider adapter 需要它把工具结果和正确的 tool_use id 对上。
 		messages = append(messages, llm.Message{Role: "assistant", Content: resp.Content})
@@ -132,6 +133,22 @@ func (l *Loop) tracef(format string, args ...any) {
 		return
 	}
 	_, _ = fmt.Fprintf(l.Trace, format, args...)
+}
+
+func (l *Loop) traceResponse(resp llm.Response) {
+	for i, block := range resp.Content {
+		switch block.Type {
+		case "text":
+			l.tracef("[agent] content[%d] type=text text=%q\n", i, summarizeString(block.Text, 1000))
+		case "tool_use":
+			l.tracef("[agent] content[%d] type=tool_use name=%s id=%s input=%s\n", i, block.Name, block.ID, summarizeMap(block.Input, 500))
+		default:
+			l.tracef("[agent] content[%d] type=%s\n", i, block.Type)
+		}
+	}
+	if resp.RawBody != "" {
+		l.tracef("[agent] raw_api=%s\n", summarizeString(resp.RawBody, 4000))
+	}
 }
 
 func summarizeMap(input map[string]any, limit int) string {

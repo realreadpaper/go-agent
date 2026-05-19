@@ -48,7 +48,8 @@ func (c *OpenAIResponsesClient) Create(req Request) (Response, error) {
 	if err != nil {
 		return Response{}, err
 	}
-	return parseOpenAIResponses(raw)
+	resp, err := parseOpenAIResponses(raw)
+	return withRawBody(resp, raw, c.cfg.TraceRawAPI), err
 }
 
 func toOpenAIResponsesTools(specs []ToolSpec) []map[string]any {
@@ -232,4 +233,11 @@ func firstNonZero(values ...int) int {
 		}
 	}
 	return 0
+}
+
+func withRawBody(resp Response, raw []byte, enabled bool) Response {
+	if enabled {
+		resp.RawBody = string(raw)
+	}
+	return resp
 }

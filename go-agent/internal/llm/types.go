@@ -28,6 +28,9 @@ type ToolSpec struct {
 type Response struct {
 	Content    []ContentBlock `json:"content"`
 	StopReason string         `json:"stop_reason"`
+	// RawBody 只在显式开启原始 API trace 时填充。
+	// 它用于调试 provider adapter 的协议映射，普通业务逻辑应该继续读取 Content/StopReason。
+	RawBody string `json:"raw_body,omitempty"`
 }
 
 type Client interface {
