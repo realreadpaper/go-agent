@@ -1,0 +1,1975 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Go Agent Harness - Implementation Plan</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #7ee787;
+  --kw: #ff7b72;
+  --str: #a5d6ff;
+  --cmt: #8b949e;
+  --typ: #79c0ff;
+  --bi: #d2a8ff;
+  --num: #79c0ff;
+  --atr: #d2a8ff;
+  --sidebar-w: 260px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text);
+  line-height: 1.6; font-size: 15px;
+}
+.sidebar {
+  position: fixed; top: 0; left: 0;
+  width: var(--sidebar-w); height: 100vh;
+  background: var(--surface); border-right: 1px solid var(--border);
+  overflow-y: auto; z-index: 100;
+  padding: 20px 0;
+}
+.sidebar-header { padding: 0 20px 16px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.sidebar-header h2 { font-size: 16px; color: var(--accent); }
+.nav-list { list-style: none; }
+.nav-list li { margin: 0; }
+.nav-link {
+  display: block; padding: 6px 20px; color: var(--text-muted);
+  text-decoration: none; font-size: 13px; transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.nav-link:hover { color: var(--text); background: var(--surface2); }
+.nav-link.active { color: var(--accent); border-left-color: var(--accent); background: var(--surface2); }
+.milestones { padding: 16px 20px; border-top: 1px solid var(--border); margin-top: 16px; }
+.milestones h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+.ms { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.ms-label {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px; font-weight: 700; font-size: 11px;
+}
+.ms-a { background: #1f6feb33; color: #58a6ff; }
+.ms-b { background: #238636aa; color: #7ee787; }
+.ms-c { background: #9e6a03aa; color: #d29922; }
+.ms-d { background: #8957e5aa; color: #d2a8ff; }
+.ms-e { background: #da3633aa; color: #ff7b72; }
+.main {
+  margin-left: var(--sidebar-w);
+  padding: 32px 40px;
+  max-width: 960px;
+}
+h1 { font-size: 28px; margin-bottom: 8px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+h2 { font-size: 22px; margin: 32px 0 12px; color: var(--text); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+h3 { font-size: 18px; margin: 24px 0 8px; color: var(--accent); }
+h4 { font-size: 16px; margin: 20px 0 8px; color: var(--text-muted); }
+p { margin: 8px 0; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+strong { color: var(--text); font-weight: 600; }
+code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace; }
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; overflow-x: auto; margin: 12px 0;
+}
+pre code {
+  background: none; padding: 0; font-size: 13px; line-height: 1.5;
+  color: var(--text); display: block;
+}
+.kw { color: var(--kw); }
+.str { color: var(--str); }
+.cmt { color: var(--cmt); font-style: italic; }
+.typ { color: var(--typ); }
+.bi { color: var(--bi); }
+.num { color: var(--num); }
+.atr { color: var(--atr); }
+.table-wrap { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { background: var(--surface2); color: var(--text); font-weight: 600; text-align: left; }
+th, td { padding: 8px 12px; border: 1px solid var(--border); }
+td { color: var(--text-muted); }
+tr:hover td { background: var(--surface2); color: var(--text); }
+blockquote {
+  border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0;
+  background: var(--surface2); border-radius: 0 8px 8px 0; color: var(--text-muted);
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+ul, ol { padding-left: 24px; margin: 8px 0; }
+li { margin: 4px 0; color: var(--text-muted); }
+.checkbox-item {
+  padding: 12px 16px; margin: 8px 0; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.checkbox-item input[type="checkbox"] { margin-right: 8px; }
+.step-title { font-weight: 600; color: var(--text); }
+.step-detail { margin-top: 8px; padding-left: 28px; }
+.section { display: none; }
+.section.active { display: block; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-milestone { background: #1f6feb33; color: #58a6ff; }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border); }
+  .main { margin-left: 0; padding: 16px; }
+  .nav-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px; }
+  .nav-link { padding: 4px 12px; border-left: none; border-radius: 4px; }
+  .milestones { display: none; }
+}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+<div class="sidebar-header"><h2>Go Agent Harness</h2></div>
+<ul class="nav-list">
+<li><a href="index.html" class="nav-link" data-target="index.html">Overview</a></li>
+<li><a href="#task-01-llm-abstraction.html" class="nav-link" data-target="task-01-llm-abstraction.html">Task 1: LLM Abstraction</a></li>
+<li><a href="#task-02-s01-agent-loop.html" class="nav-link" data-target="task-02-s01-agent-loop.html">Task 2: Agent Loop</a></li>
+<li><a href="#task-03-s02-tool-use.html" class="nav-link" data-target="task-03-s02-tool-use.html">Task 3: Tool Use</a></li>
+<li><a href="#task-04-s03-todo-write.html" class="nav-link" data-target="task-04-s03-todo-write.html">Task 4: Todo Write</a></li>
+<li><a href="#task-05-s04-subagent.html" class="nav-link" data-target="task-05-s04-subagent.html">Task 5: Subagent</a></li>
+<li><a href="#task-06-s05-skill-loading.html" class="nav-link" data-target="task-06-s05-skill-loading.html">Task 6: Skill Loading</a></li>
+<li><a href="#task-07-s06-context-compact.html" class="nav-link" data-target="task-07-s06-context-compact.html">Task 7: Context Compact</a></li>
+<li><a href="#task-08-s07-task-system.html" class="nav-link" data-target="task-08-s07-task-system.html">Task 8: Task System</a></li>
+<li><a href="#task-09-s08-background-tasks.html" class="nav-link" data-target="task-09-s08-background-tasks.html">Task 9: Background Tasks</a></li>
+<li><a href="#task-10-s09-agent-teams.html" class="nav-link" data-target="task-10-s09-agent-teams.html">Task 10: Agent Teams</a></li>
+<li><a href="#task-11-s10-team-protocols.html" class="nav-link" data-target="task-11-s10-team-protocols.html">Task 11: Team Protocols</a></li>
+<li><a href="#task-12-s11-autonomous-agents.html" class="nav-link" data-target="task-12-s11-autonomous-agents.html">Task 12: Autonomous</a></li>
+<li><a href="#task-13-s12-worktree-isolation.html" class="nav-link" data-target="task-13-s12-worktree-isolation.html">Task 13: Worktree</a></li>
+<li><a href="#task-14-sfull-readme.html" class="nav-link" data-target="task-14-sfull-readme.html">Task 14: Capstone</a></li>
+</ul>
+<div class="milestones">
+<h3>Milestones</h3>
+<div class="ms"><span class="ms-label ms-a">A</span> Task 1-4</div>
+<div class="ms"><span class="ms-label ms-b">B</span> Task 5-7</div>
+<div class="ms"><span class="ms-label ms-c">C</span> Task 8-9</div>
+<div class="ms"><span class="ms-label ms-d">D</span> Task 10-12</div>
+<div class="ms"><span class="ms-label ms-e">E</span> Task 13-14</div>
+</div>
+</nav>
+<main class="main">
+<div id="section-index.html" class="section active">
+<h1>Go Agent Harness — Master Plan</h1>
+
+<blockquote><p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.</p></blockquote>
+
+<p><strong>Goal:</strong> 基于 <code>/Users/hejianglong/Desktop/github/learn-claude-code/docs/zh</code> 的 s01-s12 文档，实现一个 Go 语言版本的 Claude Code 风格 agent harness 教学项目。</p>
+
+<p><strong>Architecture:</strong> Go 版本保留原文档的核心教学线索：一个稳定 agent loop，加上工具分发、Todo、Subagent、Skill、压缩、任务图、后台任务、团队邮箱、协议、自主认领和 worktree 隔离。实现上用共享 <code>internal/*</code> 包承载机制，用 <code>cmd/s01</code> 到 <code>cmd/s12</code> 暴露逐步演进示例，避免每节复制整套逻辑。</p>
+
+<p><strong>Tech Stack:</strong> Go 1.23+、standard library、direct HTTP LLM adapters、OpenAI Responses API、OpenAI-compatible Chat Completions API、DeepSeek Anthropic-compatible Messages API、DeepSeek OpenAI-compatible Chat API、<code>gopkg.in/yaml.v3</code>、<code>go test</code>、JSON/JSONL 持久化、<code>os/exec</code>、goroutine/channel、<code>git worktree</code>。</p>
+
+<h2>第一次阅读路线</h2>
+
+<p>如果你第一次接触 agent，可以先把本计划理解成一条逐层加能力的路线，而不是 14 个互不相关的任务。Agent harness 的核心不是“让模型更聪明”，而是给模型一个可靠的运行外壳：它能反复调用模型、执行工具、保存状态、把结果放回上下文，并在任务变复杂时保持可恢复、可协作、可测试。</p>
+
+<ul><li><strong>Task 1 是地基：</strong>它不直接对应源教程的 s01-s12，而是先把 LLM API、消息格式、工具 schema 和 fake client 抽象出来。没有这一层，后面的 agent loop 会和某个厂商 API 绑死，测试也会依赖真实网络。</li>
+<li><strong>Task 2-13 对应 s01-s12：</strong>每一节只增加一个主要能力，从最小循环开始，逐步加入工具、计划、子 agent、技能加载、压缩、任务图、后台执行、团队、协议、自治和 worktree 隔离。</li>
+<li><strong>Task 14 是整合：</strong>它把前面分散的机制组装成一个完整 demo，并通过 README 把 Go 版本能力映射回中文源教程。</li></ul>
+
+<p>阅读每个任务页时，建议先看“新手先懂”部分，再看 Files 和 Steps。Files 告诉你这个机制在 Go 项目里落到哪些边界上，Steps 则告诉你如何用测试把机制一步步固定下来。你不需要一开始就懂所有 agent 概念，只要能回答“模型下一步如何决定、工具结果如何回到模型、状态保存在内存还是磁盘”这三个问题，就能沿着计划往下走。</p>
+
+<hr>
+
+<h2>任务索引</h2>
+
+<div class="table-wrap"><table>
+<thead><tr><th>文件</th><th>任务</th><th>依赖</th><th>里程碑</th></tr></thead>
+<tbody>
+<tr><td><a href="task-01-llm-abstraction.html">task-01-llm-abstraction.html</a></td><td>初始化 Go 项目与 LLM 抽象</td><td>无</td><td>A</td></tr>
+<tr><td><a href="task-02-s01-agent-loop.html">task-02-s01-agent-loop.html</a></td><td>s01 agent loop 和 bash 工具</td><td>Task 1</td><td>A</td></tr>
+<tr><td><a href="task-03-s02-tool-use.html">task-03-s02-tool-use.html</a></td><td>s02 工具分发、文件工具和路径沙箱</td><td>Task 2</td><td>A</td></tr>
+<tr><td><a href="task-04-s03-todo-write.html">task-04-s03-todo-write.html</a></td><td>s03 TodoWrite 和 nag reminder</td><td>Task 3</td><td>A</td></tr>
+<tr><td><a href="task-05-s04-subagent.html">task-05-s04-subagent.html</a></td><td>s04 Subagent</td><td>Task 2</td><td>B</td></tr>
+<tr><td><a href="task-06-s05-skill-loading.html">task-06-s05-skill-loading.html</a></td><td>s05 Skill 加载</td><td>Task 3</td><td>B</td></tr>
+<tr><td><a href="task-07-s06-context-compact.html">task-07-s06-context-compact.html</a></td><td>s06 上下文压缩</td><td>Task 2</td><td>B</td></tr>
+<tr><td><a href="task-08-s07-task-system.html">task-08-s07-task-system.html</a></td><td>s07 持久任务图</td><td>Task 2</td><td>C</td></tr>
+<tr><td><a href="task-09-s08-background-tasks.html">task-09-s08-background-tasks.html</a></td><td>s08 后台任务</td><td>Task 2</td><td>C</td></tr>
+<tr><td><a href="task-10-s09-agent-teams.html">task-10-s09-agent-teams.html</a></td><td>s09 团队邮箱与持久队友</td><td>Task 2</td><td>D</td></tr>
+<tr><td><a href="task-11-s10-team-protocols.html">task-11-s10-team-protocols.html</a></td><td>s10 request-response 团队协议</td><td>Task 10</td><td>D</td></tr>
+<tr><td><a href="task-12-s11-autonomous-agents.html">task-12-s11-autonomous-agents.html</a></td><td>s11 自主队友</td><td>Task 10, Task 8</td><td>D</td></tr>
+<tr><td><a href="task-13-s12-worktree-isolation.html">task-13-s12-worktree-isolation.html</a></td><td>s12 worktree 任务隔离</td><td>Task 8</td><td>E</td></tr>
+<tr><td><a href="task-14-sfull-readme.html">task-14-sfull-readme.html</a></td><td>capstone sfull 与 README</td><td>Task 1-13</td><td>E</td></tr>
+</tbody></table></div>
+
+
+<h2>里程碑</h2>
+
+<ol><li><strong>Milestone A: 单 agent 可用</strong> — Task 1-4。验收：s01-s03 可运行，工具分发和 Todo 单测通过。</li>
+<li><strong>Milestone B: 上下文和知识管理</strong> — Task 5-7。验收：Subagent、Skill、Compact 均可 fake 测试。</li>
+<li><strong>Milestone C: 持久任务和并发</strong> — Task 8-9。验收：<code>.tasks/</code>、后台通知队列稳定，race test 通过。</li>
+<li><strong>Milestone D: 团队协作和自治</strong> — Task 10-12。验收：JSONL inbox、request FSM、自动认领任务可测试。</li>
+<li><strong>Milestone E: worktree 隔离和整合</strong> — Task 13-14。验收：worktree 测试通过，<code>sfull</code> 编译通过。</li></ol>
+
+<hr>
+
+<h2>文档到能力映射</h2>
+
+<div class="table-wrap"><table>
+<thead><tr><th>文档</th><th>Go 版本目标</th><th>关键机制</th></tr></thead>
+<tbody>
+<tr><td><code>s01-the-agent-loop.md</code></td><td>最小 agent loop</td><td>messages 累积、LLM 调用、<code>stop_reason != tool_use</code> 退出、bash 工具</td></tr>
+<tr><td><code>s02-tool-use.md</code></td><td>工具注册表</td><td><code>ToolRegistry</code>、路径沙箱、read/write/edit/bash</td></tr>
+<tr><td><code>s03-todo-write.md</code></td><td>会话内 Todo</td><td>单一 <code>in_progress</code>、nag reminder、渲染状态</td></tr>
+<tr><td><code>s04-subagent.md</code></td><td>一次性子 agent</td><td>独立 messages、父上下文只接收摘要、禁止递归 task</td></tr>
+<tr><td><code>s05-skill-loading.md</code></td><td>按需 Skill</td><td>扫描 <code>skills/**/SKILL.md</code>、frontmatter、<code>load_skill</code></td></tr>
+<tr><td><code>s06-context-compact.md</code></td><td>三层上下文压缩</td><td>micro compact、auto compact、manual compact、transcripts</td></tr>
+<tr><td><code>s07-task-system.md</code></td><td>持久任务图</td><td><code>.tasks/task_N.json</code>、<code>blockedBy</code>、状态转换、解锁依赖</td></tr>
+<tr><td><code>s08-background-tasks.md</code></td><td>后台命令</td><td>goroutine 执行、通知队列、状态查询</td></tr>
+<tr><td><code>s09-agent-teams.md</code></td><td>持久队友</td><td><code>.team/config.json</code>、JSONL inbox、队友 goroutine loop</td></tr>
+<tr><td><code>s10-team-protocols.md</code></td><td>团队协议</td><td>request/response FSM、shutdown、plan approval</td></tr>
+<tr><td><code>s11-autonomous-agents.md</code></td><td>自主队友</td><td>WORK/IDLE、轮询收件箱和任务板、自动认领、身份重注入</td></tr>
+<tr><td><code>s12-worktree-task-isolation.md</code></td><td>任务 worktree 隔离</td><td><code>.worktrees/index.json</code>、events.jsonl、任务与 worktree 绑定</td></tr>
+</tbody></table></div>
+
+
+<h2>目标目录结构</h2>
+
+<pre><code class="lang-text">go-agent/
+  go.mod
+  go.sum
+  README.md
+  cmd/
+    s01-agent-loop/main.go
+    s02-tool-use/main.go
+    s03-todo-write/main.go
+    s04-subagent/main.go
+    s05-skill-loading/main.go
+    s06-context-compact/main.go
+    s07-task-system/main.go
+    s08-background-tasks/main.go
+    s09-agent-teams/main.go
+    s10-team-protocols/main.go
+    s11-autonomous-agents/main.go
+    s12-worktree-task-isolation/main.go
+    sfull/main.go
+  internal/
+    agent/loop.go
+    agent/options.go
+    agent/repl.go
+    llm/types.go
+    llm/config.go
+    llm/client_factory.go
+    llm/openai_responses.go
+    llm/openai_chat.go
+    llm/anthropic_compat.go
+    llm/deepseek.go
+    llm/fake.go
+    tools/registry.go
+    tools/base.go
+    tools/schema.go
+    todo/manager.go
+    subagent/subagent.go
+    skills/loader.go
+    compact/manager.go
+    tasks/manager.go
+    background/manager.go
+    team/bus.go
+    team/manager.go
+    protocols/fsm.go
+    autonomous/idle.go
+    worktree/manager.go
+    store/json.go
+    runfiles/paths.go
+  skills/
+    agent-builder/SKILL.md
+    code-review/SKILL.md
+    mcp-builder/SKILL.md
+    pdf/SKILL.md</code></pre>
+
+<p>职责边界：</p>
+
+<ul><li><code>internal/llm</code>: 只负责模型 API 抽象、多 provider HTTP adapter、请求/响应格式转换，不依赖 agent 业务。</li>
+<li><code>internal/agent</code>: 只负责消息循环、hook、工具执行和 REPL。</li>
+<li><code>internal/tools</code>: 注册工具 schema 与 handler，handler 返回字符串结果。</li>
+<li><code>internal/* manager</code>: 各机制的状态、持久化、并发控制。</li>
+<li><code>cmd/*</code>: 每节只组装本节需要的工具和 manager，不放核心业务逻辑。</li></ul>
+
+<hr>
+
+<h2>核心数据模型</h2>
+
+<p>所有任务共享以下类型定义。每个 task 文件中引用这些类型时不再重复定义，只注明"见 overview 核心数据模型"。</p>
+
+<h3><code>internal/llm/types.go</code></h3>
+
+<pre><code class="lang-go"><span class="kw">package</span> llm
+
+<span class="kw">type</span> Message <span class="kw">struct</span> {
+	Role    <span class="typ">string</span>      <span class="str">`json:&quot;role&quot;`</span>
+	Content <span class="kw">interface</span>{} <span class="str">`json:&quot;content&quot;`</span>
+}
+
+<span class="kw">type</span> ContentBlock <span class="kw">struct</span> {
+	Type  <span class="typ">string</span>         <span class="str">`json:&quot;<span class="kw">type</span>&quot;`</span>
+	ID    <span class="typ">string</span>         <span class="str">`json:&quot;id,omitempty&quot;`</span>
+	Name  <span class="typ">string</span>         <span class="str">`json:&quot;name,omitempty&quot;`</span>
+	Input <span class="kw">map</span>[<span class="typ">string</span>]any <span class="str">`json:&quot;input,omitempty&quot;`</span>
+	Text  <span class="typ">string</span>         <span class="str">`json:&quot;text,omitempty&quot;`</span>
+}
+
+<span class="kw">type</span> ToolResult <span class="kw">struct</span> {
+	Type      <span class="typ">string</span> <span class="str">`json:&quot;<span class="kw">type</span>&quot;`</span>
+	ToolUseID <span class="typ">string</span> <span class="str">`json:&quot;tool_use_id&quot;`</span>
+	Content   <span class="typ">string</span> <span class="str">`json:&quot;content&quot;`</span>
+}
+
+<span class="kw">type</span> ToolSpec <span class="kw">struct</span> {
+	Name        <span class="typ">string</span>         <span class="str">`json:&quot;name&quot;`</span>
+	Description <span class="typ">string</span>         <span class="str">`json:&quot;description&quot;`</span>
+	InputSchema <span class="kw">map</span>[<span class="typ">string</span>]any <span class="str">`json:&quot;input_schema&quot;`</span>
+}
+
+<span class="kw">type</span> Response <span class="kw">struct</span> {
+	Content    []ContentBlock <span class="str">`json:&quot;content&quot;`</span>
+	StopReason <span class="typ">string</span>         <span class="str">`json:&quot;stop_reason&quot;`</span>
+}
+
+<span class="kw">type</span> Client <span class="kw">interface</span> {
+	Create(req Request) (Response, <span class="typ">error</span>)
+}
+
+<span class="kw">type</span> Request <span class="kw">struct</span> {
+	Model     <span class="typ">string</span>
+	System    <span class="typ">string</span>
+	Messages  []Message
+	Tools     []ToolSpec
+	MaxTokens <span class="typ">int</span>
+}</code></pre>
+
+<h3><code>internal/tools/registry.go</code></h3>
+
+<pre><code class="lang-go"><span class="kw">package</span> tools
+
+<span class="kw">import</span> <span class="str">&quot;learn-claude-code-<span class="kw">go</span>/internal/llm&quot;</span>
+
+<span class="kw">type</span> Handler <span class="kw">func</span>(input <span class="kw">map</span>[<span class="typ">string</span>]any) (<span class="typ">string</span>, <span class="typ">error</span>)
+
+<span class="kw">type</span> Tool <span class="kw">struct</span> {
+	Spec    llm.ToolSpec
+	Handler Handler
+}
+
+<span class="kw">type</span> Registry <span class="kw">struct</span> {
+	tools <span class="kw">map</span>[<span class="typ">string</span>]Tool
+}
+
+<span class="kw">func</span> NewRegistry() *Registry {
+	<span class="kw">return</span> &amp;Registry{tools: <span class="kw">map</span>[<span class="typ">string</span>]Tool{}}
+}
+
+<span class="kw">func</span> (r *Registry) Register(t Tool) {
+	r.tools[t.Spec.Name] = t
+}
+
+<span class="kw">func</span> (r *Registry) Specs() []llm.ToolSpec {
+	specs := <span class="bi">make</span>([]llm.ToolSpec, 0, <span class="bi">len</span>(r.tools))
+	<span class="kw">for</span> _, tool := <span class="kw">range</span> r.tools {
+		specs = <span class="bi">append</span>(specs, tool.Spec)
+	}
+	<span class="kw">return</span> specs
+}
+
+<span class="kw">func</span> (r *Registry) Run(name <span class="typ">string</span>, input <span class="kw">map</span>[<span class="typ">string</span>]any) <span class="typ">string</span> {
+	tool, ok := r.tools[name]
+	<span class="kw">if</span> !ok {
+		<span class="kw">return</span> <span class="str">&quot;Error: unknown tool: &quot;</span> + name
+	}
+	out, err := tool.Handler(input)
+	<span class="kw">if</span> err != <span class="bi"><span class="bi">nil</span></span> {
+		<span class="kw">return</span> <span class="str">&quot;Error: &quot;</span> + err.Error()
+	}
+	<span class="kw">if</span> out == <span class="str">&quot;&quot;</span> {
+		<span class="kw">return</span> <span class="str">&quot;(no output)&quot;</span>
+	}
+	<span class="kw">return</span> out
+}</code></pre>
+
+<h3><code>internal/agent/loop.go</code></h3>
+
+<pre><code class="lang-go"><span class="kw">package</span> agent
+
+<span class="kw">import</span> <span class="str">&quot;learn-claude-code-<span class="kw">go</span>/internal/llm&quot;</span>
+
+<span class="kw">type</span> BeforeCallHook <span class="kw">func</span>(messages *[]llm.Message) <span class="typ">error</span>
+<span class="kw">type</span> AfterToolHook <span class="kw">func</span>(name <span class="typ">string</span>)
+
+<span class="kw">type</span> Loop <span class="kw">struct</span> {
+	Client     llm.Client
+	Model      <span class="typ">string</span>
+	System     <span class="typ">string</span>
+	Tools      ToolRunner
+	MaxTokens  <span class="typ">int</span>
+	MaxRounds  <span class="typ">int</span>
+	BeforeCall []BeforeCallHook
+	AfterTool  []AfterToolHook
+}
+
+<span class="kw">type</span> ToolRunner <span class="kw">interface</span> {
+	Specs() []llm.ToolSpec
+	Run(name <span class="typ">string</span>, input <span class="kw">map</span>[<span class="typ">string</span>]any) <span class="typ">string</span>
+}
+
+<span class="kw">func</span> (l *Loop) Run(messages []llm.Message) ([]llm.Message, llm.Response, <span class="typ">error</span>) {
+	<span class="kw">var</span> resp llm.Response
+	rounds := l.MaxRounds
+	<span class="kw">if</span> rounds == 0 {
+		rounds = 50
+	}
+	<span class="kw">for</span> i := 0; i &lt; rounds; i++ {
+		<span class="kw">for</span> _, hook := <span class="kw">range</span> l.BeforeCall {
+			<span class="kw">if</span> err := hook(&amp;messages); err != <span class="bi"><span class="bi">nil</span></span> {
+				<span class="kw">return</span> messages, resp, err
+			}
+		}
+		<span class="kw">var</span> err <span class="typ">error</span>
+		resp, err = l.Client.Create(llm.Request{
+			Model: l.Model, System: l.System, Messages: messages,
+			Tools: l.Tools.Specs(), MaxTokens: l.MaxTokens,
+		})
+		<span class="kw">if</span> err != <span class="bi"><span class="bi">nil</span></span> {
+			<span class="kw">return</span> messages, resp, err
+		}
+		messages = <span class="bi">append</span>(messages, llm.Message{Role: <span class="str">&quot;assistant&quot;</span>, Content: resp.Content})
+		<span class="kw">if</span> resp.StopReason != <span class="str">&quot;tool_use&quot;</span> {
+			<span class="kw">return</span> messages, resp, <span class="bi"><span class="bi">nil</span></span>
+		}
+		results := <span class="bi">make</span>([]llm.ToolResult, 0)
+		<span class="kw">for</span> _, block := <span class="kw">range</span> resp.Content {
+			<span class="kw">if</span> block.Type != <span class="str">&quot;tool_use&quot;</span> {
+				<span class="kw">continue</span>
+			}
+			output := l.Tools.Run(block.Name, block.Input)
+			<span class="kw">for</span> _, hook := <span class="kw">range</span> l.AfterTool {
+				hook(block.Name)
+			}
+			results = <span class="bi">append</span>(results, llm.ToolResult{Type: <span class="str">&quot;tool_result&quot;</span>, ToolUseID: block.ID, Content: output})
+		}
+		messages = <span class="bi">append</span>(messages, llm.Message{Role: <span class="str">&quot;user&quot;</span>, Content: results})
+	}
+	<span class="kw">return</span> messages, resp, <span class="bi"><span class="bi">nil</span></span>
+}</code></pre>
+
+<h3><code>internal/llm/config.go</code></h3>
+
+<pre><code class="lang-go"><span class="kw">package</span> llm
+
+<span class="kw">type</span> Provider <span class="typ">string</span>
+
+<span class="kw">const</span> (
+	ProviderOpenAI          Provider = <span class="str">&quot;openai&quot;</span>
+	ProviderDeepSeek        Provider = <span class="str">&quot;deepseek&quot;</span>
+	ProviderAnthropicCompat Provider = <span class="str">&quot;anthropic_compat&quot;</span>
+)
+
+<span class="kw">type</span> APIStyle <span class="typ">string</span>
+
+<span class="kw">const</span> (
+	APIStyleOpenAIResponses APIStyle = <span class="str">&quot;openai_responses&quot;</span>
+	APIStyleOpenAIChat      APIStyle = <span class="str">&quot;openai_chat&quot;</span>
+	APIStyleAnthropic       APIStyle = <span class="str">&quot;anthropic_messages&quot;</span>
+)
+
+<span class="kw">type</span> Config <span class="kw">struct</span> {
+	Provider        Provider
+	APIStyle        APIStyle
+	Model           <span class="typ">string</span>
+	APIKey          <span class="typ">string</span>
+	BaseURL         <span class="typ">string</span>
+	MaxTokens       <span class="typ">int</span>
+	ReasoningEffort <span class="typ">string</span>
+	ThinkingEnabled <span class="typ">bool</span>
+	Store           <span class="typ">bool</span>
+}
+
+<span class="kw">func</span> DefaultConfigFromEnv() (Config, <span class="typ">error</span>)</code></pre>
+
+<p>Provider 默认值：</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Provider</th><th>默认 model</th><th>默认 API style</th><th>base URL</th></tr></thead>
+<tbody>
+<tr><td><code>openai</code></td><td><code>gpt-5.5</code></td><td><code>openai_responses</code></td><td><code>https://api.openai.com</code></td></tr>
+<tr><td><code>deepseek</code></td><td><code>deepseek-v4-pro</code></td><td><code>anthropic_messages</code></td><td><code>https://api.deepseek.com/anthropic</code></td></tr>
+<tr><td><code>deepseek</code></td><td><code>deepseek-v4-flash</code></td><td><code>openai_chat</code></td><td><code>https://api.deepseek.com</code></td></tr>
+</tbody></table></div>
+
+
+<hr>
+
+<h2>测试策略</h2>
+
+<ul><li>单元测试优先使用 fake LLM，不依赖网络和真实 API key。</li>
+<li>文件状态机测试全部使用 <code>t.TempDir()</code>。</li>
+<li>worktree 测试创建临时 git repo：</li></ul>
+
+<pre><code class="lang-bash"><span class="kw">git</span> init
+<span class="kw">git</span> config user.email <span class="kw">test</span>@example.com
+<span class="kw">git</span> config user.name <span class="kw">test</span>
+<span class="kw">echo</span> hello &gt; README.md
+<span class="kw">git</span> add README.md
+<span class="kw">git</span> commit -m init</code></pre>
+
+<ul><li>并发 manager 跑 race：<code>go test -race ./internal/background ./internal/team</code></li>
+<li>每个里程碑必须运行：<code>go test ./...</code> 和 <code>go vet ./...</code></li></ul>
+
+<h2>关键设计约束</h2>
+
+<ul><li>Agent loop 保持稳定：新增机制通过 tool registry、before hook、after hook、manager 注入，不改 loop 主流程。</li>
+<li>所有工具 handler 返回字符串，不直接写 stdout。</li>
+<li>所有路径工具必须使用 workdir 沙箱。</li>
+<li>所有可恢复状态写磁盘：<code>.tasks/</code>、<code>.team/</code>、<code>.transcripts/</code>、<code>.worktrees/</code>。</li>
+<li>所有并发状态必须由 mutex/channel 保护。</li>
+<li>LLM API 隔离在 <code>internal/llm</code>，业务测试不访问网络。</li>
+<li>OpenAI 默认走 Responses API；DeepSeek V4 默认走 Anthropic-compatible Messages API。</li>
+<li>Provider adapter 只做协议转换，不执行工具、不读取业务状态。</li>
+<li>教学项目不实现完整生产权限系统，只保留危险命令拦截和路径沙箱。</li></ul>
+
+<h2>最终验收标准</h2>
+
+<ul><li><code>go test ./...</code> 通过。</li>
+<li><code>go vet ./...</code> 通过。</li>
+<li><code>go test -race ./internal/background ./internal/team</code> 通过。</li>
+<li><code>cmd/s01-agent-loop</code> 到 <code>cmd/s12-worktree-task-isolation</code> 全部可编译。</li>
+<li>README 能把每个 Go cmd 映射回中文文档 s01-s12。</li>
+<li><code>internal/llm</code> 覆盖 OpenAI Responses、OpenAI Chat、DeepSeek Anthropic-compatible、DeepSeek OpenAI-compatible 的无网络 adapter tests。</li></ul>
+</div><div id="section-task-01-llm-abstraction.html" class="section">
+<h1>Task 1: 初始化 Go 项目与 LLM 抽象</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> 无</p></blockquote>
+
+<p><strong>Goal:</strong> 创建 Go module 并实现多 provider LLM client 层，支持 OpenAI Responses、OpenAI Chat、Anthropic-compatible、DeepSeek，所有 adapter 使用 <code>httptest.Server</code> 测试，不访问真实网络。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>这一节先不急着实现 agent 行为，而是先做“模型连接层”。Agent 的每一步都要问一次模型：现在看到这些消息和工具，你下一步要说话还是调用工具？如果这层直接散落在业务代码里，后面每加一个机制都要重新处理 API 请求、响应解析、错误和测试。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>Message：</strong>对话历史中的一条记录。用户输入、助手回复、工具结果都会变成 message，agent loop 靠它们让模型知道刚才发生了什么。</li>
+<li><strong>ToolSpec：</strong>告诉模型“有哪些工具可以用、参数长什么样”。模型不会真的执行工具，它只会输出一个结构化的 tool call。</li>
+<li><strong>Response：</strong>模型返回的内容，可能是普通文本，也可能是 tool_use。后续循环会根据 <code>stop_reason</code> 决定是否执行工具。</li>
+<li><strong>FakeClient：</strong>测试用的假模型。它让我们不用真实 API key，也能验证 loop、工具分发和状态机。</li></ul>
+
+<h3>为什么这样拆</h3>
+<p><code>internal/llm</code> 只负责协议转换，不知道 agent、任务、文件系统或团队协作。这样后续从 OpenAI Responses 换成 OpenAI-compatible Chat 或 DeepSeek adapter 时，agent 主流程不需要改。第一次读代码时，可以把这层看成“模型插座”：外面接不同 provider，里面统一输出 Go 结构体。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能解释一次 LLM 调用需要哪些输入、模型如何表达“我要调用工具”、为什么业务测试必须依赖 fake client，以及为什么 provider adapter 不能执行工具。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/go.mod</code></li>
+<li>Create: <code>go-agent/internal/llm/types.go</code></li>
+<li>Create: <code>go-agent/internal/llm/config.go</code></li>
+<li>Create: <code>go-agent/internal/llm/client_factory.go</code></li>
+<li>Create: <code>go-agent/internal/llm/openai_responses.go</code></li>
+<li>Create: <code>go-agent/internal/llm/openai_chat.go</code></li>
+<li>Create: <code>go-agent/internal/llm/anthropic_compat.go</code></li>
+<li>Create: <code>go-agent/internal/llm/deepseek.go</code></li>
+<li>Create: <code>go-agent/internal/llm/fake.go</code></li>
+<li>Test: <code>go-agent/internal/llm/fake_test.go</code></li>
+<li>Test: <code>go-agent/internal/llm/config_test.go</code></li>
+<li>Test: <code>go-agent/internal/llm/openai_responses_test.go</code></li>
+<li>Test: <code>go-agent/internal/llm/openai_chat_test.go</code></li>
+<li>Test: <code>go-agent/internal/llm/anthropic_compat_test.go</code></li></ul>
+
+<hr>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 初始化模块**</span>
+<div class="step-detail">
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> mod init learn-claude-code-<span class="kw">go</span>
+<span class="kw">go</span> get gopkg.in/yaml.v3@latest</code></pre>
+
+<p>Expected: <code>go.mod</code> 存在，module 为 <code>learn-claude-code-go</code>。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 写 <code>llm</code> 类型、配置解析与 fake client 测试**</span>
+<div class="step-detail">
+<p>类型定义见 overview 核心数据模型中的 <code>internal/llm/types.go</code> 和 <code>internal/llm/config.go</code>。</p>
+
+<p>测试覆盖：</p>
+<ul><li><code>FakeClient</code> 按顺序返回预设响应；响应耗尽时返回错误。</li>
+<li><code>DefaultConfigFromEnv()</code> 可解析 OpenAI GPT-5.5：</li></ul>
+
+<pre><code class="lang-bash">AGENT_LLM_PROVIDER=openai
+AGENT_LLM_API_STYLE=openai_responses
+AGENT_MODEL=gpt-5.5
+OPENAI_API_KEY=<span class="kw">test</span>-key</code></pre>
+
+<ul><li><code>DefaultConfigFromEnv()</code> 可解析 DeepSeek V4 Pro：</li></ul>
+
+<pre><code class="lang-bash">AGENT_LLM_PROVIDER=deepseek
+AGENT_LLM_API_STYLE=anthropic_messages
+AGENT_MODEL=deepseek-v4-pro
+DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
+
+<ul><li>缺少 provider 对应 API key 时返回清晰错误。</li></ul>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/llm</code></pre>
+
+<p>Expected: PASS。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现 OpenAI Responses adapter**</span>
+<div class="step-detail">
+<p>要求：</p>
+<ul><li>从 <code>OPENAI_API_KEY</code> 读取 key。</li>
+<li><code>OPENAI_BASE_URL</code> 可覆盖，默认 <code>https://api.openai.com</code>。</li>
+<li>请求 <code>POST <base>/v1/responses</code>。</li>
+<li><code>ToolSpec</code> 转为 OpenAI function tool。</li>
+<li><code>ContentBlock{Type:"tool_use"}</code> 转为 Responses API 续轮输入。</li>
+<li>工具执行结果转为 <code>function_call_output</code>，并绑定正确 <code>call_id</code>。</li>
+<li><code>reasoning.effort</code> 从 <code>AGENT_REASONING_EFFORT</code> 读取，默认 <code>medium</code>。</li>
+<li><code>store</code> 默认 <code>false</code>，避免教学 CLI 无意保存响应。</li>
+<li>失败响应返回包含 status code 和 body 的 error。</li></ul>
+
+<p>请求结构：</p>
+
+<pre><code class="lang-go"><span class="kw">type</span> openAIResponsesRequest <span class="kw">struct</span> {
+	Model           <span class="typ">string</span>           <span class="str">`json:&quot;model&quot;`</span>
+	Instructions    <span class="typ">string</span>           <span class="str">`json:&quot;instructions,omitempty&quot;`</span>
+	Input           []<span class="kw">map</span>[<span class="typ">string</span>]any <span class="str">`json:&quot;input&quot;`</span>
+	Tools           []<span class="kw">map</span>[<span class="typ">string</span>]any <span class="str">`json:&quot;tools,omitempty&quot;`</span>
+	MaxOutputTokens <span class="typ">int</span>              <span class="str">`json:&quot;max_output_tokens,omitempty&quot;`</span>
+	Reasoning       <span class="kw">map</span>[<span class="typ">string</span>]any   <span class="str">`json:&quot;reasoning,omitempty&quot;`</span>
+	Store           <span class="typ">bool</span>             <span class="str">`json:&quot;store&quot;`</span>
+}</code></pre>
+
+<p>工具 schema 转换：</p>
+
+<pre><code class="lang-go"><span class="kw">func</span> toOpenAIFunctionTools(specs []ToolSpec) []<span class="kw">map</span>[<span class="typ">string</span>]any {
+	tools := <span class="bi">make</span>([]<span class="kw">map</span>[<span class="typ">string</span>]any, 0, <span class="bi">len</span>(specs))
+	<span class="kw">for</span> _, spec := <span class="kw">range</span> specs {
+		tools = <span class="bi">append</span>(tools, <span class="kw">map</span>[<span class="typ">string</span>]any{
+			<span class="str">&quot;<span class="kw">type</span>&quot;</span>:        <span class="str">&quot;function&quot;</span>,
+			<span class="str">&quot;name&quot;</span>:        spec.Name,
+			<span class="str">&quot;description&quot;</span>: spec.Description,
+			<span class="str">&quot;parameters&quot;</span>:  spec.InputSchema,
+		})
+	}
+	<span class="kw">return</span> tools
+}</code></pre>
+
+<p>响应转换规则：</p>
+<ul><li><code>output[].type == "function_call"</code> -> <code>ContentBlock{Type:"tool_use", ID: call_id, Name: name, Input: parsed arguments}</code>。</li>
+<li><code>output[].type == "message"</code> 中的文本 -> <code>ContentBlock{Type:"text", Text: text}</code>。</li>
+<li>只要存在 function call，统一返回 <code>StopReason: "tool_use"</code>。</li>
+<li>reasoning items：保留在 provider transcript 中；当 OpenAI 返回需要回传的 reasoning item 时，下一轮 Responses input 必须包含上一轮 output item 和本地 <code>function_call_output</code> item。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现 OpenAI Chat adapter**</span>
+<div class="step-detail">
+<p>要求：</p>
+<ul><li>请求 <code>POST <base>/v1/chat/completions</code>。</li>
+<li>system prompt 转为首条 <code>role=system</code>。</li>
+<li><code>ToolSpec</code> 转为 Chat Completions <code>tools: [{type:"function", function:{...}}]</code>。</li>
+<li><code>finish_reason == "tool_calls"</code> 映射为 <code>StopReason: "tool_use"</code>。</li>
+<li><code>tool_calls[].function.arguments</code> 必须用 <code>encoding/json</code> 解析为 <code>map[string]any</code>。</li>
+<li><code>llm.Message{Role:"user", Content: []ToolResult}</code> 转为 <code>role=tool</code> messages；<code>tool_call_id</code> 使用 <code>ToolUseID</code>。</li>
+<li>assistant <code>tool_calls</code> 转为本项目 <code>tool_use</code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 Anthropic-compatible adapter**</span>
+<div class="step-detail">
+<p>要求：</p>
+<ul><li>支持标准 Anthropic endpoint 或兼容 endpoint。</li>
+<li>DeepSeek 默认 base URL 使用 <code>https://api.deepseek.com/anthropic</code>。</li>
+<li>请求 <code>/v1/messages</code>。</li>
+<li>默认 header 包含兼容 Anthropic 的 <code>anthropic-version: 2023-06-01</code>。</li>
+<li><code>tool_use/tool_result</code> 与内部模型一一映射。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现 DeepSeek provider wrapper**</span>
+<div class="step-detail">
+<p>要求：</p>
+<ul><li><code>Provider=deepseek</code> 且 <code>APIStyle=anthropic_messages</code> 时创建 <code>AnthropicCompatClient</code>。</li>
+<li><code>Provider=deepseek</code> 且 <code>APIStyle=openai_chat</code> 时创建 <code>OpenAIChatClient</code>。</li>
+<li>默认模型为 <code>deepseek-v4-pro</code>。</li>
+<li>默认 API style 为 <code>anthropic_messages</code>。</li>
+<li><code>deepseek-v4-flash</code> 作为 README 中的低成本示例，不作为默认值。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 实现 client factory**</span>
+<div class="step-detail">
+<pre><code class="lang-go"><span class="kw">func</span> NewClient(cfg Config, httpClient *http.Client) (Client, <span class="typ">error</span>)</code></pre>
+
+<p>路由规则：</p>
+<ul><li><code>openai + openai_responses</code> -> <code>OpenAIResponsesClient</code>。</li>
+<li><code>openai + openai_chat</code> -> <code>OpenAIChatClient</code>。</li>
+<li><code>deepseek + anthropic_messages</code> -> <code>DeepSeekClient</code> 包装 <code>AnthropicCompatClient</code>。</li>
+<li><code>deepseek + openai_chat</code> -> <code>DeepSeekClient</code> 包装 <code>OpenAIChatClient</code>。</li>
+<li>不支持的 provider/style 组合返回错误，错误中列出允许组合。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 8: 运行 LLM 层测试**</span>
+<div class="step-detail">
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/llm</code></pre>
+
+<p>Expected: PASS。测试使用 <code>httptest.Server</code>，不得访问真实网络。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 9: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/<span class="kw">go</span>.mod <span class="kw">go</span>-agent/<span class="kw">go</span>.sum <span class="kw">go</span>-agent/internal/llm
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add multi-provider llm clients&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-02-s01-agent-loop.html" class="section">
+<h1>Task 2: 实现 s01 agent loop 和 bash 工具</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 1 (LLM 抽象层)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现稳定的 agent loop、工具注册表和 bash 工具，组成最小可运行的 s01 命令。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s01 的核心句子是：一个循环加一个工具，就已经是最小 agent。这里的“agent”不是神秘的新模型，而是一段程序：它把用户请求发给 LLM，看到模型要调用工具时替它执行，再把工具结果放回对话，直到模型不再请求工具。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>Agent loop：</strong>不断重复“调用模型 -> 执行工具 -> 写回结果”的控制流。loop 是 harness 的心脏，后续章节都尽量不改它。</li>
+<li><strong><code>stop_reason</code>：</strong>模型告诉 harness 自己为什么停下。如果是 <code>tool_use</code>，说明要执行工具；否则说明可以把回答交给用户。</li>
+<li><strong>ToolRunner：</strong>Go 里的接口，屏蔽具体工具实现。loop 只知道“列出工具”和“按名称运行工具”。</li>
+<li><strong>bash 工具：</strong>最粗粒度但最有用的工具，可以跑命令、看文件、执行测试，也是安全边界最需要谨慎的地方。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s01 用 Python 展示 <code>while True</code> 循环和单个 bash 工具。本任务把同样的机制落到 Go：<code>internal/agent/loop.go</code> 放循环，<code>internal/tools/registry.go</code> 放工具注册表，<code>cmd/s01-agent-loop</code> 提供可运行入口。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能画出一次完整工具调用的路径：用户 message 进入模型，模型返回 tool_use，Go 执行 bash，tool_result 作为新的 user message 回到模型。只要这条路径稳定，后面所有复杂能力都有地方挂载。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/agent/loop.go</code></li>
+<li>Create: <code>go-agent/internal/tools/registry.go</code></li>
+<li>Create: <code>go-agent/internal/tools/base.go</code></li>
+<li>Create: <code>go-agent/cmd/s01-agent-loop/main.go</code></li>
+<li>Test: <code>go-agent/internal/agent/loop_test.go</code></li>
+<li>Test: <code>go-agent/internal/tools/base_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务依赖 Task 1 完成的 <code>internal/llm</code> 包。核心类型见 overview 核心数据模型：</p>
+<ul><li><code>internal/agent/loop.go</code> — <code>Loop</code>、<code>BeforeCallHook</code>、<code>AfterToolHook</code>、<code>ToolRunner</code> 接口</li>
+<li><code>internal/tools/registry.go</code> — <code>Handler</code>、<code>Tool</code>、<code>Registry</code></li></ul>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写 loop 测试**</span>
+<div class="step-detail">
+<p>场景：</p>
+<ul><li>fake client 第一轮返回 <code>tool_use</code>，工具结果被追加为 user message。</li>
+<li>fake client 第二轮返回文本，loop 退出。</li>
+<li><code>MaxRounds</code> 防止无限工具调用。</li></ul>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/agent</code></pre>
+
+<p>Expected: 先 FAIL，提示 <code>Loop</code> 未定义。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 loop 与 registry**</span>
+<div class="step-detail">
+<p>按 overview 核心数据模型中的代码实现 <code>Loop.Run</code> 和 <code>Registry</code>。工具结果内容截断到 50,000 字符。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现 bash 工具**</span>
+<div class="step-detail">
+<p><code>internal/tools/base.go</code>：</p>
+<ul><li><code>RegisterBash(reg, workdir string)</code>。</li>
+<li>使用 <code>exec.CommandContext(ctx, "bash", "-lc", command)</code>。</li>
+<li>timeout 120 秒。</li>
+<li>拦截危险片段：<code>rm -rf /</code>、<code>sudo</code>、<code>shutdown</code>、<code>reboot</code>、<code>> /dev/</code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现 s01 CLI**</span>
+<div class="step-detail">
+<p><code>cmd/s01-agent-loop/main.go</code>：</p>
+<ul><li>从命令行参数或 stdin 读取 prompt。</li>
+<li>调用 <code>llm.DefaultConfigFromEnv()</code> 和 <code>llm.NewClient()</code>，构造 provider-specific client、<code>tools.Registry</code>、<code>agent.Loop</code>。</li>
+<li>注册仅 <code>bash</code>。</li>
+<li>system prompt 说明当前 workdir 和 bash 工具。</li></ul>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./...
+<span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;What is the current <span class="kw">git</span> branch?&quot;</span></code></pre>
+
+<p>Expected: 测试 PASS；运行命令时如未配置 API key，打印清晰错误。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/agent <span class="kw">go</span>-agent/internal/tools <span class="kw">go</span>-agent/cmd/s01-agent-loop
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): implement s01 agent loop&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-03-s02-tool-use.html" class="section">
+<h1>Task 3: 实现 s02 工具分发、文件工具和路径沙箱</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop + registry)</p></blockquote>
+
+<p><strong>Goal:</strong> 在工具注册表中添加 <code>read_file</code>、<code>write_file</code>、<code>edit_file</code>，全部路径限制在 workdir 沙箱内。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s02 的重点是：加工具不应该改 agent loop。s01 只有 bash，模型能做很多事，但所有事情都绕到 shell，既难控制又难测试。s02 把常见文件操作变成专用工具，让 harness 可以在工具层加路径沙箱、参数校验和稳定输出。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>工具分发：</strong>模型输出工具名和参数，harness 用工具名在 registry 中找到 handler。这个查表过程代替一长串 if/else。</li>
+<li><strong>专用工具：</strong><code>read_file</code> 比 <code>cat</code> 更可控，<code>write_file</code> 比 shell 重定向更容易测试，<code>edit_file</code> 可以限制必须命中旧文本。</li>
+<li><strong>路径沙箱：</strong>任何文件路径都先转换成 workdir 内的绝对路径，禁止 <code>../</code> 逃到项目外。</li>
+<li><strong>稳定返回字符串：</strong>工具 handler 不直接写 stdout，而是返回字符串给 loop，再由 loop 组装为 tool_result。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s02 强调 dispatch map。本任务用 Go 的 <code>Registry</code> 表达同一个思想：新增工具就是注册一个 <code>ToolSpec</code> 和一个 <code>Handler</code>，不碰 <code>Loop.Run</code> 的主流程。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能解释为什么工具越具体，agent 越可靠；为什么路径安全必须放在工具边界；以及为什么“loop 不变、工具可扩展”是后续 harness 演进的关键。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code>go-agent/internal/tools/base.go</code></li>
+<li>Create: <code>go-agent/cmd/s02-tool-use/main.go</code></li>
+<li>Test: <code>go-agent/internal/tools/base_test.go</code></li></ul>
+
+<hr>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写路径沙箱测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li><code>read_file</code> 可读 workdir 内文件。</li>
+<li><code>../outside.txt</code> 返回 path escapes workspace。</li>
+<li><code>write_file</code> 自动创建父目录。</li>
+<li><code>edit_file</code> 只替换第一次出现的 <code>old_text</code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 <code>SafePath</code> 与文件工具**</span>
+<div class="step-detail">
+<p>Go 实现点：</p>
+<ul><li><code>filepath.Abs</code> + <code>filepath.Rel</code> 判断路径没有 <code>..</code> 前缀。</li>
+<li><code>read_file</code> 支持 <code>limit</code> 行数。</li>
+<li>文件读写使用 <code>os.ReadFile</code>、<code>os.WriteFile</code>。</li>
+<li><code>edit_file</code> 找不到文本时返回 <code>Error: text not found in <path></code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现 s02 CLI**</span>
+<div class="step-detail">
+<p>注册 <code>bash</code>、<code>read_file</code>、<code>write_file</code>、<code>edit_file</code>。</p>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/tools
+<span class="kw">go</span> run ./cmd/s02-tool-use <span class="str">&quot;Create a file called greet.<span class="kw">go</span> with a greet function, then read it&quot;</span></code></pre>
+
+<p>Expected: 测试 PASS；CLI 可让模型调用文件工具。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/tools <span class="kw">go</span>-agent/cmd/s02-tool-use
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add file tools and dispatch&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-04-s03-todo-write.html" class="section">
+<h1>Task 4: 实现 s03 TodoWrite 和 nag reminder</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 3 (文件工具)</p></blockquote>
+
+<p><strong>Goal:</strong> 添加会话内 Todo 管理工具，支持状态校验、渲染和 nag reminder hook。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s03 解决的是“模型做多步任务容易忘步骤”的问题。TodoWrite 不是普通待办应用，而是给模型一个外部化的短期计划板：模型必须把计划写出来、标记当前正在做什么、完成后更新状态。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>会话内状态：</strong>Todo 存在当前运行中的 manager 里，适合一次对话内的计划，不负责跨进程恢复。</li>
+<li><strong>单一 <code>in_progress</code>：</strong>同一时间只允许一个任务进行中，迫使模型聚焦，不同时承诺多个动作。</li>
+<li><strong>Nag reminder：</strong>如果模型连续几轮不更新 todo，hook 会注入提醒。这是 harness 对模型行为的轻量约束。</li>
+<li><strong>渲染状态：</strong>工具结果应该把 todo 列表以稳定文本返回，让模型和用户都能看到当前进度。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s03 把 <code>todo</code> 加进工具集合，并在 loop 旁边维护计数器。本任务用 <code>internal/todo/manager.go</code> 承载状态校验和渲染，用 agent hook 负责提醒注入，避免把规划逻辑写死在 loop 里。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能区分“模型心里想的计划”和“harness 可检查的计划”。TodoWrite 的价值就在于把计划变成结构化状态，让测试可以验证，也让后续任务系统有清晰的对照。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/todo/manager.go</code></li>
+<li>Modify: <code>go-agent/internal/agent/options.go</code></li>
+<li>Create: <code>go-agent/cmd/s03-todo-write/main.go</code></li>
+<li>Test: <code>go-agent/internal/todo/manager_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务在 Task 3 完成的 agent loop 和 tools 基础上，新增 <code>todo</code> 工具和 nag hook。Loop 的 <code>BeforeCallHook</code> 和 <code>AfterToolHook</code> 机制在 Task 2 中已定义。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写 Todo 测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li>多个 <code>in_progress</code> 返回错误。</li>
+<li>非法状态返回错误。</li>
+<li>空 <code>content</code> 返回错误。</li>
+<li><code>Render()</code> 输出 <code>[ ]</code>、<code>[>]</code>、<code>[x]</code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 <code>TodoManager</code>**</span>
+<div class="step-detail">
+<p>字段：</p>
+
+<pre><code class="lang-go"><span class="kw">type</span> Item <span class="kw">struct</span> {
+	Content    <span class="typ">string</span> <span class="str">`json:&quot;content&quot;`</span>
+	Status     <span class="typ">string</span> <span class="str">`json:&quot;status&quot;`</span>
+	ActiveForm <span class="typ">string</span> <span class="str">`json:&quot;activeForm&quot;`</span>
+}</code></pre>
+
+<p><code>Update(items []Item) (string, error)</code> 校验状态并保存；最多 20 条。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 注册 <code>todo</code> 工具和 nag hook**</span>
+<div class="step-detail">
+<p>实现：</p>
+<ul><li><code>todo.Register(reg, manager)</code>。</li>
+<li><code>agent.WithTodoNag(manager, threshold int)</code> 返回 <code>BeforeCallHook</code> 和 <code>AfterToolHook</code> 所需状态。</li>
+<li>当连续 3 轮未调用 <code>todo</code>，向最新 user tool_result message 前插入 <code><reminder>Update your todos.</reminder></code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现 s03 CLI**</span>
+<div class="step-detail">
+<p>system prompt 明确多步任务先调用 <code>todo</code>，同一时间只有一个 <code>in_progress</code>。</p>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/todo ./internal/agent
+<span class="kw">go</span> run ./cmd/s03-todo-write <span class="str">&quot;Refactor hello.<span class="kw">go</span>: add type hints equivalent comments, doc comments, and tests&quot;</span></code></pre>
+
+<p>Expected: 测试 PASS；nag hook 单测可验证 reminder 注入。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/todo <span class="kw">go</span>-agent/internal/agent <span class="kw">go</span>-agent/cmd/s03-todo-write
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add todo planning tool&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-05-s04-subagent.html" class="section">
+<h1>Task 5: 实现 s04 Subagent</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop + registry)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现一次性子 agent runner，父 agent 通过 <code>task</code> 工具派发任务，只接收最终摘要。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s04 引入 subagent，是为了解决上下文污染。父 agent 经常只想知道一个结论，比如“项目用什么测试框架”，但调查这个结论可能要读很多文件。让父 agent 自己读完所有文件，会把大量临时信息留在主上下文里。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>父 agent：</strong>负责主任务和最终决策，拥有 <code>task</code> 工具。</li>
+<li><strong>子 agent：</strong>用全新的 messages 启动，完成一个局部调查或操作，结束后丢弃自己的上下文。</li>
+<li><strong>摘要返回：</strong>父 agent 只收到最终摘要，不收到子 agent 的全部工具调用历史。</li>
+<li><strong>禁止递归 task：</strong>子 agent 不再拥有 <code>task</code> 工具，避免无限生成子任务。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s04 的 Python 版本用 <code>run_subagent()</code> 创建独立循环。本任务把它落到 <code>internal/subagent/subagent.go</code>：共享 LLM client 和基础工具，但隔离 messages，并用最大轮数保护执行边界。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能判断什么时候该用 subagent：当任务需要大量探索，但父上下文只需要结论时。Subagent 的核心不是并行，而是上下文隔离和信息压缩。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/subagent/subagent.go</code></li>
+<li>Create: <code>go-agent/cmd/s04-subagent/main.go</code></li>
+<li>Test: <code>go-agent/internal/subagent/subagent_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务依赖 Task 2 的 <code>agent.Loop</code> 和 <code>tools.Registry</code>。子 agent 复用相同的 loop 机制，但使用独立的 messages 和受限的工具集。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写 subagent 测试**</span>
+<div class="step-detail">
+<p>用 fake client 验证：</p>
+<ul><li>子 agent 使用全新的 messages。</li>
+<li>父 agent 只收到最终摘要字符串。</li>
+<li>子 agent 工具集中没有 <code>task</code>，防止递归。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 <code>Runner</code>**</span>
+<div class="step-detail">
+<pre><code class="lang-go"><span class="kw">type</span> Runner <span class="kw">struct</span> {
+	Client    llm.Client
+	Model     <span class="typ">string</span>
+	System    <span class="typ">string</span>
+	Tools     *tools.Registry
+	MaxRounds <span class="typ">int</span>
+}
+
+<span class="kw">func</span> (r *Runner) Run(prompt <span class="typ">string</span>) (<span class="typ">string</span>, <span class="typ">error</span>)</code></pre>
+
+<p>摘要提取逻辑：拼接最终 response 中所有 <code>text</code> block；为空返回 <code>(no summary)</code>。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 注册父端 <code>task</code> 工具**</span>
+<div class="step-detail">
+<p><code>RegisterTask(reg, runner)</code>，input schema:</p>
+
+<pre><code class="lang-json">{<span class="kw"><span class="str">&quot;type&quot;</span></span>:<span class="str">&quot;object&quot;</span>,<span class="kw"><span class="str">&quot;properties&quot;</span></span>:{<span class="kw"><span class="str">&quot;prompt&quot;</span></span>:{<span class="kw"><span class="str">&quot;type&quot;</span></span>:<span class="str">&quot;string&quot;</span>}},<span class="kw"><span class="str">&quot;required&quot;</span></span>:[<span class="str">&quot;prompt&quot;</span>]}</code></pre>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现 s04 CLI**</span>
+<div class="step-detail">
+<p>父端工具包含 base tools + <code>task</code>；子端工具仅包含 base tools。</p>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/subagent
+<span class="kw">go</span> run ./cmd/s04-subagent <span class="str">&quot;Use a subtask to <span class="kw">find</span> what testing framework this project uses&quot;</span></code></pre>
+
+<p>Expected: 测试 PASS；父上下文只记录 task 的摘要结果。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/subagent <span class="kw">go</span>-agent/cmd/s04-subagent
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add subagent runner&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-06-s05-skill-loading.html" class="section">
+<h1>Task 6: 实现 s05 Skill 加载</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 3 (文件工具和路径沙箱)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现按需 skill 加载，从磁盘扫描 <code>skills/**/SKILL.md</code>，解析 YAML frontmatter，通过 <code>load_skill</code> 工具注入完整 skill 内容。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s05 讨论“知识什么时候给模型”。如果把所有工作流、代码审查清单、框架说明都塞进 system prompt，模型每一轮都要带着大量无关 token。Skill loading 的做法是先只告诉模型有哪些 skill，等模型真的需要时再加载完整内容。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>Skill 描述层：</strong>系统提示中只放名称和一句描述，成本低，帮助模型知道可选能力。</li>
+<li><strong>Skill 内容层：</strong>模型调用 <code>load_skill</code> 后，完整 <code>SKILL.md</code> 通过 tool_result 进入上下文。</li>
+<li><strong>Frontmatter：</strong><code>SKILL.md</code> 顶部的 YAML 元数据，用来声明 name、description 等可索引信息。</li>
+<li><strong>按需注入：</strong>不是 harness 主动猜，而是让模型根据任务显式请求。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s05 使用两层提示模型。本任务用 <code>internal/skills/loader.go</code> 扫描磁盘 skill，用 <code>gopkg.in/yaml.v3</code> 解析 frontmatter，再注册 <code>load_skill</code> 工具。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能解释为什么 skill 不是普通配置文件：它是可被模型按需加载的操作指南。好的 skill loading 让 agent 拥有更多领域能力，同时不让每轮上下文膨胀。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/skills/loader.go</code></li>
+<li>Create: <code>go-agent/cmd/s05-skill-loading/main.go</code></li>
+<li>Copy/Create: <code>go-agent/skills/*/SKILL.md</code></li>
+<li>Test: <code>go-agent/internal/skills/loader_test.go</code></li></ul>
+
+<hr>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 复制示例 skills**</span>
+<div class="step-detail">
+<p>从 <code>/Users/hejianglong/Desktop/github/learn-claude-code/skills</code> 复制到 <code>go-agent/skills</code>，保持目录名不变。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 写 loader 测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li>递归扫描 <code>SKILL.md</code>。</li>
+<li>YAML frontmatter 中 <code>name</code> 优先于目录名。</li>
+<li><code>Descriptions()</code> 只输出名称和 description。</li>
+<li><code>Load("missing")</code> 返回 unknown skill 错误文本。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现 loader**</span>
+<div class="step-detail">
+<p>使用 <code>gopkg.in/yaml.v3</code> 解析 frontmatter。<code>Load(name)</code> 返回：</p>
+
+<pre><code class="lang-xml"><span class="kw">&lt;skill</span> <span class="atr">name</span>=<span class="str">&quot;code-review&quot;</span><span class="kw">&gt;</span>
+...
+<span class="kw">&lt;/skill</span><span class="kw">&gt;</span></code></pre>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 注册 <code>load_skill</code> 工具**</span>
+<div class="step-detail">
+<p>system prompt 包含：</p>
+
+<pre><code class="lang-text">Skills available:
+  - agent-builder: ...
+  - code-review: ...</code></pre>
+
+<p>完整 Skill 内容只通过 tool result 注入。</p>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/skills
+<span class="kw">go</span> run ./cmd/s05-skill-loading <span class="str">&quot;What skills are available?&quot;</span></code></pre>
+
+<p>Expected: 测试 PASS；CLI 能列出可用 skill。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/skills <span class="kw">go</span>-agent/skills <span class="kw">go</span>-agent/cmd/s05-skill-loading <span class="kw">go</span>-agent/<span class="kw">go</span>.mod <span class="kw">go</span>-agent/<span class="kw">go</span>.sum
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add on-demand skill loading&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-07-s06-context-compact.html" class="section">
+<h1>Task 7: 实现 s06 上下文压缩</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现三层上下文压缩：micro compact（截断旧工具结果）、auto compact（token 阈值触发 LLM 摘要）、manual compact（模型主动调用工具）。完整 transcript 落盘 JSONL。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s06 解决上下文窗口有限的问题。Agent 工作越久，messages 里积累的工具输出越多。即使模型本身还能推理，太长的上下文也会让成本升高、注意力分散，最终无法继续。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>Micro compact：</strong>每轮静默处理，把很久以前的大块工具结果替换成短占位符，保留“做过什么”的痕迹。</li>
+<li><strong>Auto compact：</strong>估算 token 超过阈值后，保存完整 transcript，再让模型总结当前任务状态。</li>
+<li><strong>Manual compact：</strong>模型或用户主动调用 compact 工具，在关键节点压缩上下文。</li>
+<li><strong>Transcript：</strong>完整历史写入磁盘。活跃上下文变短，不等于历史不可恢复。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s06 展示三层压缩策略。本任务用 <code>internal/compact/manager.go</code> 统一管理 token 估算、旧结果替换、摘要调用和 JSONL transcript。Loop 只通过 before hook 调用它，仍保持主流程稳定。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能说清“压缩”不是简单删除，而是在保留可恢复历史的前提下，给模型一个更短、更有用的工作记忆。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/compact/manager.go</code></li>
+<li>Create: <code>go-agent/cmd/s06-context-compact/main.go</code></li>
+<li>Test: <code>go-agent/internal/compact/manager_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务依赖 Task 2 的 <code>agent.Loop</code> 和 <code>BeforeCallHook</code> 机制。compact manager 作为 hook 注入 loop，不修改 loop 主流程。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写 micro compact 测试**</span>
+<div class="step-detail">
+<p>构造 6 个 tool_result，<code>KeepRecent=3</code>。执行后前 3 个长结果变为 <code>[Previous: used <tool>]</code>，最近 3 个保持原文。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 token 估算**</span>
+<div class="step-detail">
+<p><code>EstimateTokens(messages []llm.Message) int</code>：将 JSON 长度除以 4，作为教学实现的近似值。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现 auto compact**</span>
+<div class="step-detail">
+<p><code>Manager.AutoCompact(messages)</code>：</p>
+<ul><li>保存完整 JSONL 到 <code>.transcripts/transcript_<unix>.jsonl</code>。</li>
+<li>调用 <code>llm.Client</code> 生成摘要。</li>
+<li>返回单条 user message：<code>[Compressed]\n\n<summary></code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 注册 manual <code>compact</code> 工具**</span>
+<div class="step-detail">
+<p>因为工具 handler 需要修改 loop 外部状态，用 <code>Manager.RequestManual()</code> 设置标记；下一轮工具执行后由 hook 替换 messages。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 s06 CLI**</span>
+<div class="step-detail">
+<p>BeforeCall 顺序： 1. <code>MicroCompact</code> 2. <code>AutoCompactIfNeeded</code></p>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/compact
+<span class="kw">go</span> run ./cmd/s06-context-compact <span class="str">&quot;Use the compact tool to manually compress the conversation&quot;</span></code></pre>
+
+<p>Expected: 测试 PASS；<code>.transcripts/</code> 写入 JSONL。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/compact <span class="kw">go</span>-agent/cmd/s06-context-compact
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add context compaction&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-08-s07-task-system.html" class="section">
+<h1>Task 8: 实现 s07 持久任务图</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现持久任务图，任务保存为 <code>.tasks/task_N.json</code>，支持 <code>blockedBy</code> 依赖、状态转换和自动解锁。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s07 从会话内 todo 升级到磁盘上的任务图。TodoWrite 适合“我现在这轮要做什么”，但真实项目会跨会话、跨 agent、跨目录运行。任务必须在上下文压缩和进程重启之后仍然存在。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>任务图：</strong>任务之间可以有依赖关系，不是单纯列表。A 完成后，B 和 C 可能同时解锁。</li>
+<li><strong><code>blockedBy</code>：</strong>一个任务被哪些前置任务阻塞。为空且状态为 pending 的任务就是 ready。</li>
+<li><strong>状态转换：</strong><code>pending -> in_progress -> completed</code> 让 agent 和测试都能判断任务处于哪一步。</li>
+<li><strong>磁盘持久化：</strong>每个任务一个 JSON 文件，方便恢复，也方便后续多个 agent 通过文件协调。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s07 把任务保存到 <code>.tasks/</code> 并提供 create/update/list/get 工具。本任务用 <code>internal/tasks/manager.go</code> 实现同样的 CRUD、依赖解除和 ready 列表，给 s08 之后的并发与团队协作打基础。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能区分 Todo 和 Task：Todo 是当前会话的短期计划，Task 是长期、可恢复、可分配的工作单元。后面的后台任务、团队和 worktree 都会围绕 Task 运转。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/tasks/manager.go</code></li>
+<li>Create: <code>go-agent/cmd/s07-task-system/main.go</code></li>
+<li>Test: <code>go-agent/internal/tasks/manager_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务依赖 Task 2 的 <code>tools.Registry</code>。任务图是独立的持久化机制，不依赖 Todo 或 Subagent。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写任务图测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li><code>Create</code> 生成递增 ID。</li>
+<li><code>Update(id, completed)</code> 自动从其他任务 <code>blockedBy</code> 移除该 ID。</li>
+<li><code>ListReady()</code> 只返回 <code>pending</code>、无 owner、<code>blockedBy</code> 为空的任务。</li>
+<li>状态仅允许 <code>pending</code>、<code>in_progress</code>、<code>completed</code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现任务模型**</span>
+<div class="step-detail">
+<pre><code class="lang-go"><span class="kw">type</span> Task <span class="kw">struct</span> {
+	ID          <span class="typ">int</span>    <span class="str">`json:&quot;id&quot;`</span>
+	Subject     <span class="typ">string</span> <span class="str">`json:&quot;subject&quot;`</span>
+	Description <span class="typ">string</span> <span class="str">`json:&quot;description&quot;`</span>
+	Status      <span class="typ">string</span> <span class="str">`json:&quot;status&quot;`</span>
+	BlockedBy   []<span class="typ">int</span>  <span class="str">`json:&quot;blockedBy&quot;`</span>
+	Owner       <span class="typ">string</span> <span class="str">`json:&quot;owner&quot;`</span>
+	Worktree    <span class="typ">string</span> <span class="str">`json:&quot;worktree&quot;`</span>
+}</code></pre>
+
+<p>每个任务保存为 <code>.tasks/task_<id>.json</code>。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 注册工具**</span>
+<div class="step-detail">
+<p>工具：</p>
+<ul><li><code>task_create(subject, description)</code></li>
+<li><code>task_update(task_id, status, add_blocked_by, remove_blocked_by, owner, worktree)</code></li>
+<li><code>task_get(task_id)</code></li>
+<li><code>task_list()</code></li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现 s07 CLI**</span>
+<div class="step-detail">
+<p>保留 s03 Todo，但 system prompt 说明：复杂、多轮、跨 agent 目标优先使用持久 task graph。</p>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/tasks
+<span class="kw">go</span> run ./cmd/s07-task-system <span class="str">&quot;Create 3 tasks: setup, write code, write tests. Make them depend on each other.&quot;</span></code></pre>
+
+<p>Expected: <code>.tasks/task_1.json</code> 等文件存在；依赖完成后自动解锁。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/tasks <span class="kw">go</span>-agent/cmd/s07-task-system
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add persistent task graph&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-09-s08-background-tasks.html" class="section">
+<h1>Task 9: 实现 s08 后台任务</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现后台命令执行器，用 goroutine 运行长命令，通过通知队列异步向 loop 注入结果。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s08 让慢命令不再卡住 agent。阻塞式工具调用很简单，但遇到测试、安装依赖、构建镜像这类长任务时，模型只能等待。后台任务把“等待外部进程”交给 harness，模型可以继续安排其他工作。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>后台执行：</strong>工具调用立即返回任务 ID，真实命令在 goroutine 中继续运行。</li>
+<li><strong>通知队列：</strong>后台命令完成后不直接调用模型，而是把结果放进队列，等下一轮 loop 统一注入。</li>
+<li><strong>状态查询：</strong>模型可以用 task ID 查看命令是否 running、done 或 failed。</li>
+<li><strong>并发安全：</strong>后台 goroutine 和主 loop 会同时读写状态，必须用 mutex 或 channel 保护。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s08 用后台线程和队列表达这个机制。本任务在 Go 中使用 goroutine/channel 或 mutex 封装到 <code>internal/background/manager.go</code>，并让 before hook 在每次 LLM 调用前 drain 通知。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能解释为什么后台结果要“注入到下一轮上下文”，而不是在 goroutine 里直接驱动模型。这样 loop 仍是单一控制点，外部并发只负责产生事件。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/background/manager.go</code></li>
+<li>Create: <code>go-agent/cmd/s08-background-tasks/main.go</code></li>
+<li>Test: <code>go-agent/internal/background/manager_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务依赖 Task 2 的 <code>agent.Loop</code> 和 <code>BeforeCallHook</code>。后台任务 manager 通过 hook 在每轮 LLM 调用前 drain 通知。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写后台任务测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li><code>Run("echo done")</code> 立即返回 task id。</li>
+<li>完成后 <code>DrainNotifications()</code> 返回结果并清空队列。</li>
+<li><code>Check(id)</code> 返回 <code>running</code> 或 <code>completed</code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 manager**</span>
+<div class="step-detail">
+<p>用 goroutine + mutex + buffered channel。命令执行：</p>
+<ul><li><code>exec.CommandContext(ctx, "bash", "-lc", command)</code>。</li>
+<li>timeout 300 秒。</li>
+<li>stdout + stderr 截断 50,000 字符；通知摘要截断 500 字符。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 注册工具和 before hook**</span>
+<div class="step-detail">
+<p>工具：</p>
+<ul><li><code>background_run(command)</code></li>
+<li><code>background_check(task_id)</code></li></ul>
+
+<p>BeforeCall hook：将 drain 出的通知追加为：</p>
+
+<pre><code class="lang-xml"><span class="kw">&lt;background-results</span><span class="kw">&gt;</span>
+[bg:abcd1234] done
+<span class="kw">&lt;/background-results</span><span class="kw">&gt;</span></code></pre>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现 s08 CLI**</span>
+<div class="step-detail">
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/background
+<span class="kw">go</span> run ./cmd/s08-background-tasks <span class="str">&quot;Run &<span class="cmt">#x27;<span class="kw">sleep</span> 5 &amp;&amp; <span class="kw">echo</span> done&#x27; in the background, then create a file while it runs&quot;</span></span></code></pre>
+
+<p>Expected: 模型可在后台命令运行期间继续调用其他工具。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/background <span class="kw">go</span>-agent/cmd/s08-background-tasks
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add background command runner&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-10-s09-agent-teams.html" class="section">
+<h1>Task 10: 实现 s09 团队邮箱与持久队友</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现基于 JSONL inbox 的消息总线和持久队友。每个队友运行独立 goroutine loop，通过邮箱异步通信。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s09 从单个 agent 扩展到团队。Subagent 是一次性的，后台任务只能跑命令；团队里的 teammate 则是有名字、有角色、有生命周期的 agent loop，可以跨多轮收消息、回消息、继续工作。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>Teammate：</strong>一个独立运行的 agent loop，有自己的 messages、角色和状态。</li>
+<li><strong>Roster：</strong><code>.team/config.json</code> 记录团队成员和状态，让主 agent 知道谁存在。</li>
+<li><strong>Inbox：</strong>每个成员一个 JSONL 文件，别人发送消息就是追加一行。</li>
+<li><strong>Drain-on-read：</strong>读取 inbox 后清空，避免同一条消息反复进入上下文。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s09 用 JSONL inbox 做文件级消息总线。本任务用 <code>internal/team/bus.go</code> 管消息追加和读取，用 <code>internal/team/manager.go</code> 管队友 goroutine、状态和生命周期。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能把团队协作看成多个 agent loop 通过磁盘消息队列协调。它不是共享一个大上下文，而是每个 agent 保持自己的上下文，只通过显式消息交换信息。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/team/bus.go</code></li>
+<li>Create: <code>go-agent/internal/team/manager.go</code></li>
+<li>Create: <code>go-agent/cmd/s09-agent-teams/main.go</code></li>
+<li>Test: <code>go-agent/internal/team/bus_test.go</code></li>
+<li>Test: <code>go-agent/internal/team/manager_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务依赖 Task 2 的 <code>agent.Loop</code>。每个队友是一个独立的 loop 实例，运行在自己的 goroutine 中。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写 MessageBus 测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li><code>Send</code> append JSON line 到 <code>.team/inbox/<to>.jsonl</code>。</li>
+<li><code>ReadInbox(name)</code> 返回全部消息并清空文件。</li>
+<li>空 inbox 返回 <code>[]</code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 team config**</span>
+<div class="step-detail">
+<p><code>.team/config.json</code>：</p>
+
+<pre><code class="lang-json">{<span class="kw"><span class="str">&quot;members&quot;</span></span>:[{<span class="kw"><span class="str">&quot;name&quot;</span></span>:<span class="str">&quot;alice&quot;</span>,<span class="kw"><span class="str">&quot;role&quot;</span></span>:<span class="str">&quot;coder&quot;</span>,<span class="kw"><span class="str">&quot;status&quot;</span></span>:<span class="str">&quot;working&quot;</span>}]}</code></pre>
+
+<p>manager 内存中维护 goroutine cancel 函数和状态锁。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现队友 loop**</span>
+<div class="step-detail">
+<p>每个队友：</p>
+<ul><li>独立 messages。</li>
+<li>每次 LLM 调用前读自己的 inbox。</li>
+<li>结束时状态改为 <code>idle</code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 注册团队工具**</span>
+<div class="step-detail">
+<p>工具：</p>
+<ul><li><code>spawn_teammate(name, role, prompt)</code></li>
+<li><code>list_teammates()</code></li>
+<li><code>send_message(to, content)</code></li>
+<li><code>broadcast(content)</code></li>
+<li><code>read_inbox(name)</code></li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 s09 CLI**</span>
+<div class="step-detail">
+<p>支持 REPL 命令：</p>
+<ul><li><code>/team</code> 输出 config。</li>
+<li><code>/inbox</code> drain lead inbox。</li></ul>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/team
+<span class="kw">go</span> run ./cmd/s09-agent-teams <span class="str">&quot;Spawn alice as coder and bob as tester. Have alice send bob a message.&quot;</span></code></pre>
+
+<p>Expected: <code>.team/config.json</code> 和 <code>.team/inbox/*.jsonl</code> 可观察。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/cmd/s09-agent-teams
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add persistent agent teams&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-11-s10-team-protocols.html" class="section">
+<h1>Task 11: 实现 s10 request-response 团队协议</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 10 (团队邮箱与持久队友)</p></blockquote>
+
+<p><strong>Goal:</strong> 在团队通信基础上添加结构化 request-response 协议，支持 shutdown 和 plan approval 两种 kind，通过 FSM 跟踪请求状态。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s10 解决“消息有了，但协商没有规矩”的问题。普通消息适合通知，却不适合需要确认的动作，比如请求队友关机、审批高风险计划。协议给这些动作加上 request ID 和状态机。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>Request ID：</strong>每个请求一个唯一 ID，响应必须引用同一个 ID，才能把来回两条消息配对。</li>
+<li><strong>FSM：</strong>有限状态机。这里最小状态是 <code>pending -> approved</code> 或 <code>pending -> rejected</code>。</li>
+<li><strong>Shutdown protocol：</strong>领导请求队友优雅退出，队友可以先收尾再批准。</li>
+<li><strong>Plan approval：</strong>队友提交计划，领导批准或驳回，避免模型直接执行高风险变更。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s10 把 shutdown 和 plan review 都建模成同一种 request-response。本任务用 <code>internal/protocols/fsm.go</code> 承载状态转换，让团队工具只负责发送消息和更新请求状态。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能看出协议的价值不是多几个工具，而是让 agent 之间的协作可追踪、可测试、可恢复。只要有 request ID，后续就能审计“谁请求了什么、谁同意了什么”。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/protocols/fsm.go</code></li>
+<li>Modify: <code>go-agent/internal/team/manager.go</code></li>
+<li>Create: <code>go-agent/cmd/s10-team-protocols/main.go</code></li>
+<li>Test: <code>go-agent/internal/protocols/fsm_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务依赖 Task 10 的 <code>team.Manager</code> 和 <code>team.MessageBus</code>。协议请求通过 MessageBus 传递，FSM 跟踪状态转换。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写 FSM 测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li>新请求状态为 <code>pending</code>。</li>
+<li>approve 后状态为 <code>approved</code>。</li>
+<li>reject 后状态为 <code>rejected</code>。</li>
+<li>unknown request id 返回错误。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现通用请求模型**</span>
+<div class="step-detail">
+<pre><code class="lang-go"><span class="kw">type</span> Request <span class="kw">struct</span> {
+	ID      <span class="typ">string</span>         <span class="str">`json:&quot;id&quot;`</span>
+	Kind    <span class="typ">string</span>         <span class="str">`json:&quot;kind&quot;`</span>
+	From    <span class="typ">string</span>         <span class="str">`json:&quot;from&quot;`</span>
+	To      <span class="typ">string</span>         <span class="str">`json:&quot;to&quot;`</span>
+	Status  <span class="typ">string</span>         <span class="str">`json:&quot;status&quot;`</span>
+	Payload <span class="kw">map</span>[<span class="typ">string</span>]any <span class="str">`json:&quot;payload&quot;`</span>
+}</code></pre>
+
+<p>支持 kind:</p>
+<ul><li><code>shutdown</code></li>
+<li><code>plan_approval</code></li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 注册协议工具**</span>
+<div class="step-detail">
+<p>工具：</p>
+<ul><li><code>shutdown_request(teammate)</code></li>
+<li><code>shutdown_response(request_id, approve, reason)</code></li>
+<li><code>plan_submit(plan)</code></li>
+<li><code>plan_review(request_id, approve, feedback)</code></li></ul>
+
+<p>所有请求/响应通过 MessageBus 传递，并在 tracker 中更新状态。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现 graceful shutdown**</span>
+<div class="step-detail">
+<p>队友收到 approved shutdown 后：</p>
+<ul><li>完成当前工具轮。</li>
+<li>发送响应。</li>
+<li>状态改为 <code>shutdown</code>。</li>
+<li>goroutine 返回。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 s10 CLI**</span>
+<div class="step-detail">
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/protocols ./internal/team
+<span class="kw">go</span> run ./cmd/s10-team-protocols <span class="str">&quot;Spawn alice as coder, then request her shutdown.&quot;</span></code></pre>
+
+<p>Expected: shutdown request 有 request_id，状态从 pending 到 approved/rejected。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/protocols <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/cmd/s10-team-protocols
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add team request protocols&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-12-s11-autonomous-agents.html" class="section">
+<h1>Task 12: 实现 s11 自主队友</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 10 (团队邮箱), Task 8 (持久任务图)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现自主队友的 IDLE phase：轮询 inbox 和任务板，自动认领 ready 任务，超时无任务则 shutdown。支持身份重注入保持上下文。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s11 让队友从“被分配任务”变成“自己找活干”。到这一节，任务板已经持久化，团队也能通信。自治的关键是空闲阶段：队友做完当前工作后，不立刻退出，而是看看 inbox 和任务板有没有新工作。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>WORK phase：</strong>队友正在运行普通 agent loop，调用工具完成当前任务。</li>
+<li><strong>IDLE phase：</strong>模型停止工具调用后，harness 暂时接管，周期性检查 inbox 和 ready tasks。</li>
+<li><strong>自动认领：</strong>找到 <code>pending</code>、无 owner、无阻塞的任务后，把 owner 写成自己并恢复 WORK。</li>
+<li><strong>身份重注入：</strong>上下文压缩后，队友可能丢失“我是谁”的线索，harness 需要补回身份块。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s11 展示 WORK/IDLE 生命周期。本任务把空闲逻辑放进 <code>internal/autonomous/idle.go</code>，并和 <code>tasks.Manager</code>、<code>team.Bus</code> 协作，确保自动认领可以被单元测试覆盖。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能解释自治不是让模型无限自由发挥，而是给它一个受控循环：没活就等，有消息就处理，有 ready task 就认领，超时就退出。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/autonomous/idle.go</code></li>
+<li>Modify: <code>go-agent/internal/team/manager.go</code></li>
+<li>Modify: <code>go-agent/internal/tasks/manager.go</code></li>
+<li>Create: <code>go-agent/cmd/s11-autonomous-agents/main.go</code></li>
+<li>Test: <code>go-agent/internal/autonomous/idle_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务同时依赖 Task 10 的 <code>team.Manager</code>（队友 goroutine）和 Task 8 的 <code>tasks.Manager</code>（任务板）。自主认领需要两者协同。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写任务认领测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li>只认领 <code>pending</code>、<code>owner == ""</code>、<code>blockedBy == []</code> 的任务。</li>
+<li>认领后 task status 变为 <code>in_progress</code>，owner 写入队友名。</li>
+<li>已阻塞任务不被认领。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 IDLE phase**</span>
+<div class="step-detail">
+<pre><code class="lang-go"><span class="kw">type</span> IdleConfig <span class="kw">struct</span> {
+	PollInterval time.Duration
+	Timeout      time.Duration
+}</code></pre>
+
+<p>流程： 1. 每 5 秒读 inbox。 2. inbox 非空，注入 <code><inbox>...</inbox></code> 并回 WORK。 3. 扫描 ready unclaimed task。 4. 找到后 claim，并注入 <code><auto-claimed>Task #N: subject</auto-claimed></code>。 5. 60 秒无事可做则 shutdown。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现 <code>idle</code> 和 <code>claim_task</code> 工具**</span>
+<div class="step-detail">
+<p><code>idle</code> 工具让模型主动进入空闲阶段。<code>claim_task(task_id)</code> 手动认领任务，复用 TaskManager 校验。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现身份重注入**</span>
+<div class="step-detail">
+<p>当队友 messages 长度小于等于 3 时，在开头插入：</p>
+
+<pre><code class="lang-xml"><span class="kw">&lt;identity</span><span class="kw">&gt;</span>You are &#x27;alice&#x27;, role: coder, team: default. Continue your work.<span class="kw">&lt;/identity</span><span class="kw">&gt;</span></code></pre>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 s11 CLI**</span>
+<div class="step-detail">
+<p>支持 <code>/tasks</code> 和 <code>/team</code>。</p>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/autonomous ./internal/tasks ./internal/team
+<span class="kw">go</span> run ./cmd/s11-autonomous-agents <span class="str">&quot;Create 3 tasks on the board, then spawn alice and bob. Watch them auto-claim.&quot;</span></code></pre>
+
+<p>Expected: 队友能从 <code>.tasks/</code> 自动认领任务。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/autonomous <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/internal/tasks <span class="kw">go</span>-agent/cmd/s11-autonomous-agents
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add autonomous task claiming&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-13-s12-worktree-isolation.html" class="section">
+<h1>Task 13: 实现 s12 worktree 任务隔离</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 8 (持久任务图)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现 git worktree 管理，任务与 worktree 双向绑定，支持创建、运行命令、保留和移除 worktree，操作事件写入 events.jsonl。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s12 解决并行 agent 最实际的问题：多个任务不能都在同一个工作目录里改文件。任务图回答“做什么”，worktree 回答“在哪里做”。把两者绑定后，每个任务都能拥有自己的隔离目录和分支。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>Git worktree：</strong>同一个 Git 仓库可以签出多个工作目录，每个目录有自己的文件状态和分支。</li>
+<li><strong>控制面：</strong><code>.tasks/</code> 记录任务状态、owner、绑定的 worktree 名称。</li>
+<li><strong>执行面：</strong><code>.worktrees/</code> 下的隔离目录负责真实命令和代码修改。</li>
+<li><strong>事件日志：</strong><code>events.jsonl</code> 记录 create/remove/keep/failed，方便崩溃后理解发生过什么。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s12 把 task ID 和 worktree name 绑定。本任务用 <code>internal/worktree/manager.go</code> 封装 <code>git worktree</code> 命令，并在创建、执行、保留、移除时同步更新 task 状态和 worktree index。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能说清为什么 worktree 是团队 agent 的安全阀：它让并行修改有边界，让完成、保留、删除都成为显式动作，而不是混在同一个脏工作区里。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/worktree/manager.go</code></li>
+<li>Create: <code>go-agent/cmd/s12-worktree-task-isolation/main.go</code></li>
+<li>Test: <code>go-agent/internal/worktree/manager_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务依赖 Task 8 的 <code>tasks.Manager</code>（任务与 worktree 绑定）。Worktree manager 调用 <code>git worktree</code> 命令实现隔离。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写 worktree manager 测试**</span>
+<div class="step-detail">
+<p>使用临时 git 仓库：</p>
+<ul><li><code>Create("auth-refactor", taskID)</code> 调用 <code>git worktree add -b wt/auth-refactor .worktrees/auth-refactor HEAD</code>。</li>
+<li><code>.worktrees/index.json</code> 写入 worktree 记录。</li>
+<li>task 写入 <code>worktree</code>，pending 变为 <code>in_progress</code>。</li>
+<li><code>Remove(name, completeTask=true)</code> 完成任务、解绑 worktree、写 events。</li></ul>
+
+<p>临时仓库创建：</p>
+
+<pre><code class="lang-bash"><span class="kw">git</span> init
+<span class="kw">git</span> config user.email <span class="kw">test</span>@example.com
+<span class="kw">git</span> config user.name <span class="kw">test</span>
+<span class="kw">echo</span> hello &gt; README.md
+<span class="kw">git</span> add README.md
+<span class="kw">git</span> commit -m init</code></pre>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现数据模型**</span>
+<div class="step-detail">
+<pre><code class="lang-go"><span class="kw">type</span> Worktree <span class="kw">struct</span> {
+	Name   <span class="typ">string</span> <span class="str">`json:&quot;name&quot;`</span>
+	Path   <span class="typ">string</span> <span class="str">`json:&quot;path&quot;`</span>
+	Branch <span class="typ">string</span> <span class="str">`json:&quot;branch&quot;`</span>
+	TaskID <span class="typ">int</span>    <span class="str">`json:&quot;task_id&quot;`</span>
+	Status <span class="typ">string</span> <span class="str">`json:&quot;status&quot;`</span>
+}</code></pre>
+
+<p><code>.worktrees/index.json</code>：</p>
+
+<pre><code class="lang-json">{<span class="kw"><span class="str">&quot;worktrees&quot;</span></span>:[{<span class="kw"><span class="str">&quot;name&quot;</span></span>:<span class="str">&quot;auth-refactor&quot;</span>,<span class="kw"><span class="str">&quot;path&quot;</span></span>:<span class="str">&quot;.worktrees/auth-refactor&quot;</span>,<span class="kw"><span class="str">&quot;branch&quot;</span></span>:<span class="str">&quot;wt/auth-refactor&quot;</span>,<span class="kw"><span class="str">&quot;task_id&quot;</span></span>:<span class="num">1</span>,<span class="kw"><span class="str">&quot;status&quot;</span></span>:<span class="str">&quot;active&quot;</span>}]}</code></pre>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现事件流**</span>
+<div class="step-detail">
+<p>追加到 <code>.worktrees/events.jsonl</code>：</p>
+<ul><li><code>worktree.create.before</code></li>
+<li><code>worktree.create.after</code></li>
+<li><code>worktree.create.failed</code></li>
+<li><code>worktree.remove.before</code></li>
+<li><code>worktree.remove.after</code></li>
+<li><code>worktree.remove.failed</code></li>
+<li><code>worktree.keep</code></li>
+<li><code>task.completed</code></li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 注册 worktree 工具**</span>
+<div class="step-detail">
+<p>工具：</p>
+<ul><li><code>worktree_create(name, task_id)</code></li>
+<li><code>worktree_run(name, command)</code></li>
+<li><code>worktree_keep(name)</code></li>
+<li><code>worktree_remove(name, force, complete_task)</code></li>
+<li><code>worktree_list()</code></li>
+<li><code>worktree_events(limit)</code></li></ul>
+
+<p><code>worktree_run</code> 的 cwd 必须是 worktree path，不是主仓库。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 s12 CLI**</span>
+<div class="step-detail">
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/worktree ./internal/tasks
+<span class="kw">go</span> run ./cmd/s12-worktree-task-isolation <span class="str">&quot;Create worktree auth-refactor for task 1, then run <span class="kw">git</span> status in it.&quot;</span></code></pre>
+
+<p>Expected: 任务与 worktree 双向绑定；remove 可同时完成任务并移除 worktree。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/worktree <span class="kw">go</span>-agent/cmd/s12-worktree-task-isolation
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add worktree task isolation&quot;</span></code></pre>
+</div>
+</div>
+</div><div id="section-task-14-sfull-readme.html" class="section">
+<h1>Task 14: 实现 capstone <code>sfull</code> 与 README</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 1-13 全部完成</p></blockquote>
+
+<p><strong>Goal:</strong> 组装包含所有机制的完整 harness <code>sfull</code>，实现 REPL 命令，编写 README，运行 smoke tests。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>这一节是整合任务，不对应源教程中的单独一节。前面 13 个任务把机制拆开实现，是为了让每个概念都能被单独测试；现在要把它们组装成一个能演示完整能力的 <code>sfull</code>。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>组装层：</strong><code>cmd/sfull</code> 不应该重新实现业务逻辑，只负责创建 managers、注册工具、接线 hooks 和启动 REPL。</li>
+<li><strong>REPL 命令：</strong>除了自然语言输入，还需要 <code>/tasks</code>、<code>/team</code>、<code>/inbox</code>、<code>/worktrees</code> 这类直接观察状态的命令。</li>
+<li><strong>Smoke test：</strong>不验证每个细节，只验证完整程序能启动、基础命令能跑、核心 managers 能协同。</li>
+<li><strong>README 映射：</strong>读者需要知道每个 Go command 对应源中文教程哪一节，以及建议按什么顺序学习。</li></ul>
+
+<h3>为什么这样收尾</h3>
+<p>教学项目最怕“每节都能跑，但读者不知道整体是什么”。Task 14 的价值是把 agent loop、工具、状态、团队和隔离目录串成一张总图，让第一次接触 agent 的读者看到完整 harness 如何从小机制组合出来。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能从 README 反向讲清楚整条路线：最小 loop 如何长出工具、计划、记忆、持久任务、并发团队和隔离执行环境。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/cmd/sfull/main.go</code></li>
+<li>Create: <code>go-agent/README.md</code></li>
+<li>Test: <code>go-agent/internal/integration/smoke_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务是最终整合，需要 Task 1-13 的所有 <code>internal/*</code> 包。</p>
+
+<p><code>sfull</code> 包含：</p>
+<ul><li>base tools (bash, read_file, write_file, edit_file)</li>
+<li>todo</li>
+<li>task subagent</li>
+<li>load_skill</li>
+<li>compact</li>
+<li>task graph</li>
+<li>background</li>
+<li>team</li>
+<li>protocols</li>
+<li>autonomous</li>
+<li>s12 worktree 工具 (默认启用，README 说明需要在 git 仓库内运行)</li></ul>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 组装 sfull**</span>
+<div class="step-detail">
+<p><code>sfull</code> 注册所有工具和 hook： 1. <code>tools.Registry</code> 注册 base tools + todo + task + load_skill + compact + task graph + background + team + protocols + autonomous + worktree。 2. <code>agent.Loop</code> 配置所有 BeforeCall 和 AfterTool hook。 3. REPL 支持用户输入和特殊命令。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 REPL 命令**</span>
+<div class="step-detail">
+<p>支持：</p>
+<ul><li><code>/compact</code></li>
+<li><code>/tasks</code></li>
+<li><code>/team</code></li>
+<li><code>/inbox</code></li>
+<li><code>/worktrees</code></li>
+<li><code>/exit</code></li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 编写 README**</span>
+<div class="step-detail">
+<p>内容：</p>
+<ul><li>环境变量：<code>AGENT_LLM_PROVIDER</code>、<code>AGENT_LLM_API_STYLE</code>、<code>AGENT_MODEL</code>、<code>AGENT_REASONING_EFFORT</code>、<code>OPENAI_API_KEY</code>、<code>OPENAI_BASE_URL</code>、<code>DEEPSEEK_API_KEY</code>、<code>DEEPSEEK_BASE_URL</code>。</li>
+<li>每个 cmd 对应文档章节。</li>
+<li>OpenAI GPT-5.5 快速开始：</li></ul>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./...
+AGENT_LLM_PROVIDER=openai \
+AGENT_LLM_API_STYLE=openai_responses \
+AGENT_MODEL=gpt-5.5 \
+OPENAI_API_KEY=... \
+<span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
+
+<ul><li>DeepSeek V4 Pro 快速开始：</li></ul>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+AGENT_LLM_PROVIDER=deepseek \
+AGENT_LLM_API_STYLE=anthropic_messages \
+AGENT_MODEL=deepseek-v4-pro \
+DEEPSEEK_API_KEY=... \
+DEEPSEEK_BASE_URL=https://api.deepseek.com/anthropic \
+<span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
+
+<ul><li>DeepSeek V4 Flash 快速开始：</li></ul>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+AGENT_LLM_PROVIDER=deepseek \
+AGENT_LLM_API_STYLE=openai_chat \
+AGENT_MODEL=deepseek-v4-flash \
+DEEPSEEK_API_KEY=... \
+DEEPSEEK_BASE_URL=https://api.deepseek.com \
+<span class="kw">go</span> run ./cmd/s01-agent-loop <span class="str">&quot;List files&quot;</span></code></pre>
+
+<ul><li>Provider 快速开始：OpenAI GPT-5.5、DeepSeek V4 Pro、DeepSeek V4 Flash。</li>
+<li>API style 选择建议：OpenAI 默认 Responses；DeepSeek 默认 Anthropic-compatible。</li>
+<li>Tool calling 映射说明：OpenAI <code>function_call</code> / Chat <code>tool_calls</code> / Anthropic <code>tool_use</code> 如何统一到内部 block。</li>
+<li>故障排查：401、404、unsupported model、tool schema rejected、reasoning items 未回传、DeepSeek unsupported field ignored。</li>
+<li>安全声明：OpenAI hosted tools 不启用，本项目只执行本地 harness tools。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: smoke tests**</span>
+<div class="step-detail">
+<p>Smoke tests 不调用真实 API，使用 fake client 覆盖：</p>
+<ul><li>所有 cmd 包可编译。</li>
+<li>s01 loop 可执行 fake 工具调用。</li>
+<li>s07-s12 的文件状态机可在 temp dir 下运行。</li></ul>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./...
+<span class="kw">go</span> <span class="kw">test</span> -race ./internal/background ./internal/team
+<span class="kw">go</span> vet ./...</code></pre>
+
+<p>Expected: 全部 PASS。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/cmd/sfull <span class="kw">go</span>-agent/README.md <span class="kw">go</span>-agent/internal/integration
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add full harness demo&quot;</span></code></pre>
+</div>
+</div>
+</div>
+</main>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const links = document.querySelectorAll('.nav-link');
+  const sections = document.querySelectorAll('.section');
+  function showSection(target) {
+    sections.forEach(s => s.classList.remove('active'));
+    links.forEach(l => l.classList.remove('active'));
+    const el = document.getElementById('section-' + target);
+    if (el) el.classList.add('active');
+    const link = document.querySelector('.nav-link[data-target="' + target + '"]');
+    if (link) link.classList.add('active');
+    history.replaceState(null, '', '#' + target);
+    window.scrollTo(0, 0);
+  }
+  links.forEach(link => {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      showSection(this.dataset.target);
+    });
+  });
+  var hash = window.location.hash.substring(1);
+  if (hash) showSection(hash);
+});
+</script>
+</body>
+</html>

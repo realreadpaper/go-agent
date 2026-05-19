@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Go Agent 开发计划</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17211b;
+      --muted: #637067;
+      --line: #d9dfd8;
+      --paper: #fbfaf4;
+      --panel: #ffffff;
+      --accent: #0f6b57;
+      --accent-2: #a73d2a;
+      --code: #26312a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(15, 107, 87, 0.08) 1px, transparent 1px),
+        linear-gradient(rgba(15, 107, 87, 0.06) 1px, transparent 1px),
+        var(--paper);
+      background-size: 32px 32px;
+      font-family: Georgia, "Times New Roman", "Noto Serif SC", serif;
+      line-height: 1.65;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 48px 0 64px;
+    }
+
+    header {
+      padding: 32px 0 28px;
+      border-bottom: 2px solid var(--ink);
+    }
+
+    .kicker {
+      margin: 0 0 12px;
+      color: var(--accent-2);
+      font: 700 13px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    h1 {
+      max-width: 900px;
+      margin: 0;
+      font-size: clamp(36px, 6vw, 76px);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 780px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: 19px;
+    }
+
+    section {
+      padding: 30px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      line-height: 1.25;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    code {
+      color: var(--code);
+      background: rgba(15, 107, 87, 0.09);
+      border: 1px solid rgba(15, 107, 87, 0.15);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 18px;
+    }
+
+    .commit {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 18px;
+      padding: 20px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .commit:first-of-type {
+      border-top: 0;
+    }
+
+    .tag {
+      color: var(--panel);
+      background: var(--accent);
+      border-radius: 4px;
+      padding: 5px 8px;
+      width: fit-content;
+      height: fit-content;
+      font: 700 13px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 22px;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    .commands {
+      margin-top: 14px;
+      padding: 14px 16px;
+      color: #f7f3e8;
+      background: #17211b;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 680px) {
+      main {
+        width: min(100% - 22px, 1120px);
+        padding-top: 22px;
+      }
+
+      .commit {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="kicker">Implementation Plan / Review Draft</p>
+      <h1>Go 版本 Agent 开发计划</h1>
+      <p class="lead">
+        依据 <code>/Users/hejianglong/Desktop/github/learn-claude-code/docs/zh</code> 下 12 篇中文文档实现一个功能完备的 Go agent。
+        当前计划保持每篇文档对应一个 commit，并在实现过程中持续补充 HTML 文档。
+      </p>
+    </header>
+
+    <section>
+      <h2>目录与输出约定</h2>
+      <div class="grid">
+        <div class="panel">
+          <h3>入口文档</h3>
+          <p><code>docs/index.html</code> 是本计划页，可直接用 <code>open ./docs/index.html</code> 打开。</p>
+          <p><code>index.html</code> 会作为根目录入口跳转到本页。</p>
+        </div>
+        <div class="panel">
+          <h3>详细方案</h3>
+          <p>完整技术方案与逐 commit 计划放在 <code>docs/technical-plan.html</code>。</p>
+          <p><a href="technical-plan.html">打开详细技术方案</a></p>
+        </div>
+        <div class="panel">
+          <h3>章节文档</h3>
+          <p>实现阶段生成 <code>docs/s01-agent-loop.html</code> 到 <code>docs/s12-worktree-task-isolation.html</code>。</p>
+        </div>
+        <div class="panel">
+          <h3>Go 代码</h3>
+          <p>CLI 入口放在 <code>cmd/go-agent/main.go</code>，核心代码放在 <code>internal/</code> 下。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>推荐架构</h2>
+      <div class="grid">
+        <div class="panel">
+          <h3><code>internal/agent</code></h3>
+          <p>维护 agent loop、消息历史、工具调用、subagent 和压缩流程。</p>
+        </div>
+        <div class="panel">
+          <h3><code>internal/llm</code></h3>
+          <p>抽象 LLM client。生产环境走 Anthropic Messages API，测试使用 fake client。</p>
+        </div>
+        <div class="panel">
+          <h3><code>internal/tools</code></h3>
+          <p>管理 bash、文件、todo、task、team、protocol、worktree 等工具注册和分发。</p>
+        </div>
+        <div class="panel">
+          <h3><code>internal/state</code></h3>
+          <p>持久化 <code>.tasks/</code>、<code>.team/</code>、<code>.worktrees/</code>、<code>.transcripts/</code>。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>12 个 Commit 边界</h2>
+
+      <article class="commit">
+        <div class="tag">s01</div>
+        <div>
+          <h3><code>feat: implement s01 agent loop</code></h3>
+          <p>初始化 Go module、CLI、LLM client 抽象、基础 agent loop 和单一 <code>bash</code> 工具。</p>
+          <ul>
+            <li>测试 fake client 返回 <code>tool_use</code> 后继续循环。</li>
+            <li>测试非 <code>tool_use</code> 时退出。</li>
+            <li>生成 <code>docs/s01-agent-loop.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s02</div>
+        <div>
+          <h3><code>feat: implement s02 tool dispatch</code></h3>
+          <p>增加工具注册表、<code>read_file</code>、<code>write_file</code>、<code>edit_file</code> 和 workspace 路径沙箱。</p>
+          <ul>
+            <li>测试路径逃逸被拒绝。</li>
+            <li>测试读写编辑和未知工具处理。</li>
+            <li>生成 <code>docs/s02-tool-use.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s03</div>
+        <div>
+          <h3><code>feat: implement s03 todo write</code></h3>
+          <p>增加 <code>TodoManager</code> 和 <code>todo</code> 工具，限制同一时间只有一个 <code>in_progress</code>，实现 reminder 注入。</p>
+          <ul>
+            <li>测试 todo 状态校验。</li>
+            <li>测试 3 轮未更新 todo 后注入提醒。</li>
+            <li>生成 <code>docs/s03-todo-write.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s04</div>
+        <div>
+          <h3><code>feat: implement s04 subagents</code></h3>
+          <p>增加 <code>task</code> 工具，让父 agent 启动隔离消息上下文的 subagent，并只接收最终摘要。</p>
+          <ul>
+            <li>测试父子上下文隔离。</li>
+            <li>测试子 agent 禁止递归创建 subagent。</li>
+            <li>生成 <code>docs/s04-subagent.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s05</div>
+        <div>
+          <h3><code>feat: implement s05 skill loading</code></h3>
+          <p>增加 <code>SkillLoader</code>，扫描 <code>skills/**/SKILL.md</code>，系统提示只注入描述，按需加载完整 skill。</p>
+          <ul>
+            <li>测试 frontmatter 解析和未知 skill。</li>
+            <li>测试系统提示只包含低成本摘要。</li>
+            <li>生成 <code>docs/s05-skill-loading.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s06</div>
+        <div>
+          <h3><code>feat: implement s06 context compaction</code></h3>
+          <p>增加 micro compact、auto compact、手动 <code>compact</code> 工具，并保存完整 transcript。</p>
+          <ul>
+            <li>测试旧 tool result 被替换为占位符。</li>
+            <li>测试 transcript 写入和摘要替换消息历史。</li>
+            <li>生成 <code>docs/s06-context-compact.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s07</div>
+        <div>
+          <h3><code>feat: implement s07 task system</code></h3>
+          <p>增加磁盘持久化任务图 <code>.tasks/task_*.json</code>，支持任务 CRUD、状态转换和 <code>blockedBy</code> 依赖解除。</p>
+          <ul>
+            <li>测试 DAG 解锁和持久化重载。</li>
+            <li>保留 s03 todo 作为会话内轻量计划。</li>
+            <li>生成 <code>docs/s07-task-system.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s08</div>
+        <div>
+          <h3><code>feat: implement s08 background tasks</code></h3>
+          <p>增加后台命令管理器，支持后台运行命令、状态查询和完成通知注入。</p>
+          <ul>
+            <li>测试后台状态流转。</li>
+            <li>测试通知队列 drain 后不重复。</li>
+            <li>生成 <code>docs/s08-background-tasks.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s09</div>
+        <div>
+          <h3><code>feat: implement s09 agent teams</code></h3>
+          <p>增加 <code>.team/config.json</code>、JSONL inbox、队友线程生命周期和团队通信工具。</p>
+          <ul>
+            <li>测试 inbox append 和 drain。</li>
+            <li>测试团队名册状态更新。</li>
+            <li>生成 <code>docs/s09-agent-teams.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s10</div>
+        <div>
+          <h3><code>feat: implement s10 team protocols</code></h3>
+          <p>增加 request-response FSM，用于 shutdown 和 plan approval 协议。</p>
+          <ul>
+            <li>测试 request id 关联。</li>
+            <li>测试 approve/reject 状态转换。</li>
+            <li>生成 <code>docs/s10-team-protocols.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s11</div>
+        <div>
+          <h3><code>feat: implement s11 autonomous agents</code></h3>
+          <p>增加 WORK/IDLE 循环、自动扫描任务板、自动认领未阻塞任务、身份重注入和空闲超时关闭。</p>
+          <ul>
+            <li>测试未分配任务自动认领。</li>
+            <li>测试阻塞任务不会被认领。</li>
+            <li>生成 <code>docs/s11-autonomous-agents.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="commit">
+        <div class="tag">s12</div>
+        <div>
+          <h3><code>feat: implement s12 worktree task isolation</code></h3>
+          <p>增加 <code>.worktrees/index.json</code>、事件流、任务与 git worktree 绑定、隔离目录执行和 keep/remove 收尾。</p>
+          <ul>
+            <li>测试临时 git repo 下 worktree 创建、运行和删除。</li>
+            <li>测试删除 worktree 时可完成绑定任务。</li>
+            <li>生成 <code>docs/s12-worktree-task-isolation.html</code>。</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section>
+      <h2>验证命令</h2>
+      <p>每个 commit 后运行：</p>
+      <div class="commands">go test ./...<br>go run ./cmd/go-agent --help</div>
+      <p>最终验证文档入口：</p>
+      <div class="commands">open index.html<br>open ./docs/index.html</div>
+    </section>
+  </main>
+</body>
+</html>

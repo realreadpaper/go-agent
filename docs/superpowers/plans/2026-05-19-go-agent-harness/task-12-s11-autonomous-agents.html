@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task 12: Autonomous - Go Agent Harness</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #7ee787;
+  --kw: #ff7b72;
+  --str: #a5d6ff;
+  --cmt: #8b949e;
+  --typ: #79c0ff;
+  --bi: #d2a8ff;
+  --num: #79c0ff;
+  --atr: #d2a8ff;
+  --sidebar-w: 260px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text);
+  line-height: 1.6; font-size: 15px;
+}
+.sidebar {
+  position: fixed; top: 0; left: 0;
+  width: var(--sidebar-w); height: 100vh;
+  background: var(--surface); border-right: 1px solid var(--border);
+  overflow-y: auto; z-index: 100;
+  padding: 20px 0;
+}
+.sidebar-header { padding: 0 20px 16px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.sidebar-header h2 { font-size: 16px; color: var(--accent); }
+.nav-list { list-style: none; }
+.nav-list li { margin: 0; }
+.nav-link {
+  display: block; padding: 6px 20px; color: var(--text-muted);
+  text-decoration: none; font-size: 13px; transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.nav-link:hover { color: var(--text); background: var(--surface2); }
+.nav-link.active { color: var(--accent); border-left-color: var(--accent); background: var(--surface2); }
+.milestones { padding: 16px 20px; border-top: 1px solid var(--border); margin-top: 16px; }
+.milestones h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+.ms { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.ms-label {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px; font-weight: 700; font-size: 11px;
+}
+.ms-a { background: #1f6feb33; color: #58a6ff; }
+.ms-b { background: #238636aa; color: #7ee787; }
+.ms-c { background: #9e6a03aa; color: #d29922; }
+.ms-d { background: #8957e5aa; color: #d2a8ff; }
+.ms-e { background: #da3633aa; color: #ff7b72; }
+.main {
+  margin-left: var(--sidebar-w);
+  padding: 32px 40px;
+  max-width: 960px;
+}
+h1 { font-size: 28px; margin-bottom: 8px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+h2 { font-size: 22px; margin: 32px 0 12px; color: var(--text); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+h3 { font-size: 18px; margin: 24px 0 8px; color: var(--accent); }
+h4 { font-size: 16px; margin: 20px 0 8px; color: var(--text-muted); }
+p { margin: 8px 0; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+strong { color: var(--text); font-weight: 600; }
+code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace; }
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; overflow-x: auto; margin: 12px 0;
+}
+pre code {
+  background: none; padding: 0; font-size: 13px; line-height: 1.5;
+  color: var(--text); display: block;
+}
+.kw { color: var(--kw); }
+.str { color: var(--str); }
+.cmt { color: var(--cmt); font-style: italic; }
+.typ { color: var(--typ); }
+.bi { color: var(--bi); }
+.num { color: var(--num); }
+.atr { color: var(--atr); }
+.table-wrap { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { background: var(--surface2); color: var(--text); font-weight: 600; text-align: left; }
+th, td { padding: 8px 12px; border: 1px solid var(--border); }
+td { color: var(--text-muted); }
+tr:hover td { background: var(--surface2); color: var(--text); }
+blockquote {
+  border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0;
+  background: var(--surface2); border-radius: 0 8px 8px 0; color: var(--text-muted);
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+ul, ol { padding-left: 24px; margin: 8px 0; }
+li { margin: 4px 0; color: var(--text-muted); }
+.checkbox-item {
+  padding: 12px 16px; margin: 8px 0; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.checkbox-item input[type="checkbox"] { margin-right: 8px; }
+.step-title { font-weight: 600; color: var(--text); }
+.step-detail { margin-top: 8px; padding-left: 28px; }
+.section { display: none; }
+.section.active { display: block; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-milestone { background: #1f6feb33; color: #58a6ff; }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border); }
+  .main { margin-left: 0; padding: 16px; }
+  .nav-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px; }
+  .nav-link { padding: 4px 12px; border-left: none; border-radius: 4px; }
+  .milestones { display: none; }
+}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+<div class="sidebar-header"><h2>Go Agent Harness</h2></div>
+<ul class="nav-list">
+<li><a href="index.html" class="nav-link">Overview</a></li>
+<li><a href="task-01-llm-abstraction.html" class="nav-link">Task 1: LLM Abstraction</a></li>
+<li><a href="task-02-s01-agent-loop.html" class="nav-link">Task 2: Agent Loop</a></li>
+<li><a href="task-03-s02-tool-use.html" class="nav-link">Task 3: Tool Use</a></li>
+<li><a href="task-04-s03-todo-write.html" class="nav-link">Task 4: Todo Write</a></li>
+<li><a href="task-05-s04-subagent.html" class="nav-link">Task 5: Subagent</a></li>
+<li><a href="task-06-s05-skill-loading.html" class="nav-link">Task 6: Skill Loading</a></li>
+<li><a href="task-07-s06-context-compact.html" class="nav-link">Task 7: Context Compact</a></li>
+<li><a href="task-08-s07-task-system.html" class="nav-link">Task 8: Task System</a></li>
+<li><a href="task-09-s08-background-tasks.html" class="nav-link">Task 9: Background Tasks</a></li>
+<li><a href="task-10-s09-agent-teams.html" class="nav-link">Task 10: Agent Teams</a></li>
+<li><a href="task-11-s10-team-protocols.html" class="nav-link">Task 11: Team Protocols</a></li>
+<li><a href="task-12-s11-autonomous-agents.html" class="nav-link active">Task 12: Autonomous</a></li>
+<li><a href="task-13-s12-worktree-isolation.html" class="nav-link">Task 13: Worktree</a></li>
+<li><a href="task-14-sfull-readme.html" class="nav-link">Task 14: Capstone</a></li>
+</ul>
+<div class="milestones">
+<h3>Milestones</h3>
+<div class="ms"><span class="ms-label ms-a">A</span> Task 1-4</div>
+<div class="ms"><span class="ms-label ms-b">B</span> Task 5-7</div>
+<div class="ms"><span class="ms-label ms-c">C</span> Task 8-9</div>
+<div class="ms"><span class="ms-label ms-d">D</span> Task 10-12</div>
+<div class="ms"><span class="ms-label ms-e">E</span> Task 13-14</div>
+</div>
+</nav>
+<main class="main">
+
+<h1>Task 12: 实现 s11 自主队友</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 10 (团队邮箱), Task 8 (持久任务图)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现自主队友的 IDLE phase：轮询 inbox 和任务板，自动认领 ready 任务，超时无任务则 shutdown。支持身份重注入保持上下文。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s11 让队友从“被分配任务”变成“自己找活干”。到这一节，任务板已经持久化，团队也能通信。自治的关键是空闲阶段：队友做完当前工作后，不立刻退出，而是看看 inbox 和任务板有没有新工作。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>WORK phase：</strong>队友正在运行普通 agent loop，调用工具完成当前任务。</li>
+<li><strong>IDLE phase：</strong>模型停止工具调用后，harness 暂时接管，周期性检查 inbox 和 ready tasks。</li>
+<li><strong>自动认领：</strong>找到 <code>pending</code>、无 owner、无阻塞的任务后，把 owner 写成自己并恢复 WORK。</li>
+<li><strong>身份重注入：</strong>上下文压缩后，队友可能丢失“我是谁”的线索，harness 需要补回身份块。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s11 展示 WORK/IDLE 生命周期。本任务把空闲逻辑放进 <code>internal/autonomous/idle.go</code>，并和 <code>tasks.Manager</code>、<code>team.Bus</code> 协作，确保自动认领可以被单元测试覆盖。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能解释自治不是让模型无限自由发挥，而是给它一个受控循环：没活就等，有消息就处理，有 ready task 就认领，超时就退出。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/autonomous/idle.go</code></li>
+<li>Modify: <code>go-agent/internal/team/manager.go</code></li>
+<li>Modify: <code>go-agent/internal/tasks/manager.go</code></li>
+<li>Create: <code>go-agent/cmd/s11-autonomous-agents/main.go</code></li>
+<li>Test: <code>go-agent/internal/autonomous/idle_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务同时依赖 Task 10 的 <code>team.Manager</code>（队友 goroutine）和 Task 8 的 <code>tasks.Manager</code>（任务板）。自主认领需要两者协同。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写任务认领测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li>只认领 <code>pending</code>、<code>owner == ""</code>、<code>blockedBy == []</code> 的任务。</li>
+<li>认领后 task status 变为 <code>in_progress</code>，owner 写入队友名。</li>
+<li>已阻塞任务不被认领。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 IDLE phase**</span>
+<div class="step-detail">
+<pre><code class="lang-go"><span class="kw">type</span> IdleConfig <span class="kw">struct</span> {
+	PollInterval time.Duration
+	Timeout      time.Duration
+}</code></pre>
+
+<p>流程： 1. 每 5 秒读 inbox。 2. inbox 非空，注入 <code><inbox>...</inbox></code> 并回 WORK。 3. 扫描 ready unclaimed task。 4. 找到后 claim，并注入 <code><auto-claimed>Task #N: subject</auto-claimed></code>。 5. 60 秒无事可做则 shutdown。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现 <code>idle</code> 和 <code>claim_task</code> 工具**</span>
+<div class="step-detail">
+<p><code>idle</code> 工具让模型主动进入空闲阶段。<code>claim_task(task_id)</code> 手动认领任务，复用 TaskManager 校验。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现身份重注入**</span>
+<div class="step-detail">
+<p>当队友 messages 长度小于等于 3 时，在开头插入：</p>
+
+<pre><code class="lang-xml"><span class="kw">&lt;identity</span><span class="kw">&gt;</span>You are &#x27;alice&#x27;, role: coder, team: default. Continue your work.<span class="kw">&lt;/identity</span><span class="kw">&gt;</span></code></pre>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 s11 CLI**</span>
+<div class="step-detail">
+<p>支持 <code>/tasks</code> 和 <code>/team</code>。</p>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/autonomous ./internal/tasks ./internal/team
+<span class="kw">go</span> run ./cmd/s11-autonomous-agents <span class="str">&quot;Create 3 tasks on the board, then spawn alice and bob. Watch them auto-claim.&quot;</span></code></pre>
+
+<p>Expected: 队友能从 <code>.tasks/</code> 自动认领任务。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/autonomous <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/internal/tasks <span class="kw">go</span>-agent/cmd/s11-autonomous-agents
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add autonomous task claiming&quot;</span></code></pre>
+</div>
+</div>
+
+</main>
+</body>
+</html>

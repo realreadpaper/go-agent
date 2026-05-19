@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task 11: Team Protocols - Go Agent Harness</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #7ee787;
+  --kw: #ff7b72;
+  --str: #a5d6ff;
+  --cmt: #8b949e;
+  --typ: #79c0ff;
+  --bi: #d2a8ff;
+  --num: #79c0ff;
+  --atr: #d2a8ff;
+  --sidebar-w: 260px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text);
+  line-height: 1.6; font-size: 15px;
+}
+.sidebar {
+  position: fixed; top: 0; left: 0;
+  width: var(--sidebar-w); height: 100vh;
+  background: var(--surface); border-right: 1px solid var(--border);
+  overflow-y: auto; z-index: 100;
+  padding: 20px 0;
+}
+.sidebar-header { padding: 0 20px 16px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.sidebar-header h2 { font-size: 16px; color: var(--accent); }
+.nav-list { list-style: none; }
+.nav-list li { margin: 0; }
+.nav-link {
+  display: block; padding: 6px 20px; color: var(--text-muted);
+  text-decoration: none; font-size: 13px; transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.nav-link:hover { color: var(--text); background: var(--surface2); }
+.nav-link.active { color: var(--accent); border-left-color: var(--accent); background: var(--surface2); }
+.milestones { padding: 16px 20px; border-top: 1px solid var(--border); margin-top: 16px; }
+.milestones h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+.ms { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.ms-label {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px; font-weight: 700; font-size: 11px;
+}
+.ms-a { background: #1f6feb33; color: #58a6ff; }
+.ms-b { background: #238636aa; color: #7ee787; }
+.ms-c { background: #9e6a03aa; color: #d29922; }
+.ms-d { background: #8957e5aa; color: #d2a8ff; }
+.ms-e { background: #da3633aa; color: #ff7b72; }
+.main {
+  margin-left: var(--sidebar-w);
+  padding: 32px 40px;
+  max-width: 960px;
+}
+h1 { font-size: 28px; margin-bottom: 8px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+h2 { font-size: 22px; margin: 32px 0 12px; color: var(--text); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+h3 { font-size: 18px; margin: 24px 0 8px; color: var(--accent); }
+h4 { font-size: 16px; margin: 20px 0 8px; color: var(--text-muted); }
+p { margin: 8px 0; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+strong { color: var(--text); font-weight: 600; }
+code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace; }
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; overflow-x: auto; margin: 12px 0;
+}
+pre code {
+  background: none; padding: 0; font-size: 13px; line-height: 1.5;
+  color: var(--text); display: block;
+}
+.kw { color: var(--kw); }
+.str { color: var(--str); }
+.cmt { color: var(--cmt); font-style: italic; }
+.typ { color: var(--typ); }
+.bi { color: var(--bi); }
+.num { color: var(--num); }
+.atr { color: var(--atr); }
+.table-wrap { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { background: var(--surface2); color: var(--text); font-weight: 600; text-align: left; }
+th, td { padding: 8px 12px; border: 1px solid var(--border); }
+td { color: var(--text-muted); }
+tr:hover td { background: var(--surface2); color: var(--text); }
+blockquote {
+  border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0;
+  background: var(--surface2); border-radius: 0 8px 8px 0; color: var(--text-muted);
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+ul, ol { padding-left: 24px; margin: 8px 0; }
+li { margin: 4px 0; color: var(--text-muted); }
+.checkbox-item {
+  padding: 12px 16px; margin: 8px 0; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.checkbox-item input[type="checkbox"] { margin-right: 8px; }
+.step-title { font-weight: 600; color: var(--text); }
+.step-detail { margin-top: 8px; padding-left: 28px; }
+.section { display: none; }
+.section.active { display: block; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-milestone { background: #1f6feb33; color: #58a6ff; }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border); }
+  .main { margin-left: 0; padding: 16px; }
+  .nav-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px; }
+  .nav-link { padding: 4px 12px; border-left: none; border-radius: 4px; }
+  .milestones { display: none; }
+}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+<div class="sidebar-header"><h2>Go Agent Harness</h2></div>
+<ul class="nav-list">
+<li><a href="index.html" class="nav-link">Overview</a></li>
+<li><a href="task-01-llm-abstraction.html" class="nav-link">Task 1: LLM Abstraction</a></li>
+<li><a href="task-02-s01-agent-loop.html" class="nav-link">Task 2: Agent Loop</a></li>
+<li><a href="task-03-s02-tool-use.html" class="nav-link">Task 3: Tool Use</a></li>
+<li><a href="task-04-s03-todo-write.html" class="nav-link">Task 4: Todo Write</a></li>
+<li><a href="task-05-s04-subagent.html" class="nav-link">Task 5: Subagent</a></li>
+<li><a href="task-06-s05-skill-loading.html" class="nav-link">Task 6: Skill Loading</a></li>
+<li><a href="task-07-s06-context-compact.html" class="nav-link">Task 7: Context Compact</a></li>
+<li><a href="task-08-s07-task-system.html" class="nav-link">Task 8: Task System</a></li>
+<li><a href="task-09-s08-background-tasks.html" class="nav-link">Task 9: Background Tasks</a></li>
+<li><a href="task-10-s09-agent-teams.html" class="nav-link">Task 10: Agent Teams</a></li>
+<li><a href="task-11-s10-team-protocols.html" class="nav-link active">Task 11: Team Protocols</a></li>
+<li><a href="task-12-s11-autonomous-agents.html" class="nav-link">Task 12: Autonomous</a></li>
+<li><a href="task-13-s12-worktree-isolation.html" class="nav-link">Task 13: Worktree</a></li>
+<li><a href="task-14-sfull-readme.html" class="nav-link">Task 14: Capstone</a></li>
+</ul>
+<div class="milestones">
+<h3>Milestones</h3>
+<div class="ms"><span class="ms-label ms-a">A</span> Task 1-4</div>
+<div class="ms"><span class="ms-label ms-b">B</span> Task 5-7</div>
+<div class="ms"><span class="ms-label ms-c">C</span> Task 8-9</div>
+<div class="ms"><span class="ms-label ms-d">D</span> Task 10-12</div>
+<div class="ms"><span class="ms-label ms-e">E</span> Task 13-14</div>
+</div>
+</nav>
+<main class="main">
+
+<h1>Task 11: 实现 s10 request-response 团队协议</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 10 (团队邮箱与持久队友)</p></blockquote>
+
+<p><strong>Goal:</strong> 在团队通信基础上添加结构化 request-response 协议，支持 shutdown 和 plan approval 两种 kind，通过 FSM 跟踪请求状态。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s10 解决“消息有了，但协商没有规矩”的问题。普通消息适合通知，却不适合需要确认的动作，比如请求队友关机、审批高风险计划。协议给这些动作加上 request ID 和状态机。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>Request ID：</strong>每个请求一个唯一 ID，响应必须引用同一个 ID，才能把来回两条消息配对。</li>
+<li><strong>FSM：</strong>有限状态机。这里最小状态是 <code>pending -> approved</code> 或 <code>pending -> rejected</code>。</li>
+<li><strong>Shutdown protocol：</strong>领导请求队友优雅退出，队友可以先收尾再批准。</li>
+<li><strong>Plan approval：</strong>队友提交计划，领导批准或驳回，避免模型直接执行高风险变更。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s10 把 shutdown 和 plan review 都建模成同一种 request-response。本任务用 <code>internal/protocols/fsm.go</code> 承载状态转换，让团队工具只负责发送消息和更新请求状态。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能看出协议的价值不是多几个工具，而是让 agent 之间的协作可追踪、可测试、可恢复。只要有 request ID，后续就能审计“谁请求了什么、谁同意了什么”。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/protocols/fsm.go</code></li>
+<li>Modify: <code>go-agent/internal/team/manager.go</code></li>
+<li>Create: <code>go-agent/cmd/s10-team-protocols/main.go</code></li>
+<li>Test: <code>go-agent/internal/protocols/fsm_test.go</code></li></ul>
+
+<hr>
+
+<h2>Context</h2>
+
+<p>本任务依赖 Task 10 的 <code>team.Manager</code> 和 <code>team.MessageBus</code>。协议请求通过 MessageBus 传递，FSM 跟踪状态转换。</p>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写 FSM 测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li>新请求状态为 <code>pending</code>。</li>
+<li>approve 后状态为 <code>approved</code>。</li>
+<li>reject 后状态为 <code>rejected</code>。</li>
+<li>unknown request id 返回错误。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现通用请求模型**</span>
+<div class="step-detail">
+<pre><code class="lang-go"><span class="kw">type</span> Request <span class="kw">struct</span> {
+	ID      <span class="typ">string</span>         <span class="str">`json:&quot;id&quot;`</span>
+	Kind    <span class="typ">string</span>         <span class="str">`json:&quot;kind&quot;`</span>
+	From    <span class="typ">string</span>         <span class="str">`json:&quot;from&quot;`</span>
+	To      <span class="typ">string</span>         <span class="str">`json:&quot;to&quot;`</span>
+	Status  <span class="typ">string</span>         <span class="str">`json:&quot;status&quot;`</span>
+	Payload <span class="kw">map</span>[<span class="typ">string</span>]any <span class="str">`json:&quot;payload&quot;`</span>
+}</code></pre>
+
+<p>支持 kind:</p>
+<ul><li><code>shutdown</code></li>
+<li><code>plan_approval</code></li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 注册协议工具**</span>
+<div class="step-detail">
+<p>工具：</p>
+<ul><li><code>shutdown_request(teammate)</code></li>
+<li><code>shutdown_response(request_id, approve, reason)</code></li>
+<li><code>plan_submit(plan)</code></li>
+<li><code>plan_review(request_id, approve, feedback)</code></li></ul>
+
+<p>所有请求/响应通过 MessageBus 传递，并在 tracker 中更新状态。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现 graceful shutdown**</span>
+<div class="step-detail">
+<p>队友收到 approved shutdown 后：</p>
+<ul><li>完成当前工具轮。</li>
+<li>发送响应。</li>
+<li>状态改为 <code>shutdown</code>。</li>
+<li>goroutine 返回。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 s10 CLI**</span>
+<div class="step-detail">
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/protocols ./internal/team
+<span class="kw">go</span> run ./cmd/s10-team-protocols <span class="str">&quot;Spawn alice as coder, then request her shutdown.&quot;</span></code></pre>
+
+<p>Expected: shutdown request 有 request_id，状态从 pending 到 approved/rejected。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/protocols <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/cmd/s10-team-protocols
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add team request protocols&quot;</span></code></pre>
+</div>
+</div>
+
+</main>
+</body>
+</html>

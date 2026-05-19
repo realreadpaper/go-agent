@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task 1: LLM Abstraction - Go Agent Harness</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #7ee787;
+  --kw: #ff7b72;
+  --str: #a5d6ff;
+  --cmt: #8b949e;
+  --typ: #79c0ff;
+  --bi: #d2a8ff;
+  --num: #79c0ff;
+  --atr: #d2a8ff;
+  --sidebar-w: 260px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text);
+  line-height: 1.6; font-size: 15px;
+}
+.sidebar {
+  position: fixed; top: 0; left: 0;
+  width: var(--sidebar-w); height: 100vh;
+  background: var(--surface); border-right: 1px solid var(--border);
+  overflow-y: auto; z-index: 100;
+  padding: 20px 0;
+}
+.sidebar-header { padding: 0 20px 16px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.sidebar-header h2 { font-size: 16px; color: var(--accent); }
+.nav-list { list-style: none; }
+.nav-list li { margin: 0; }
+.nav-link {
+  display: block; padding: 6px 20px; color: var(--text-muted);
+  text-decoration: none; font-size: 13px; transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.nav-link:hover { color: var(--text); background: var(--surface2); }
+.nav-link.active { color: var(--accent); border-left-color: var(--accent); background: var(--surface2); }
+.milestones { padding: 16px 20px; border-top: 1px solid var(--border); margin-top: 16px; }
+.milestones h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+.ms { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.ms-label {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px; font-weight: 700; font-size: 11px;
+}
+.ms-a { background: #1f6feb33; color: #58a6ff; }
+.ms-b { background: #238636aa; color: #7ee787; }
+.ms-c { background: #9e6a03aa; color: #d29922; }
+.ms-d { background: #8957e5aa; color: #d2a8ff; }
+.ms-e { background: #da3633aa; color: #ff7b72; }
+.main {
+  margin-left: var(--sidebar-w);
+  padding: 32px 40px;
+  max-width: 960px;
+}
+h1 { font-size: 28px; margin-bottom: 8px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+h2 { font-size: 22px; margin: 32px 0 12px; color: var(--text); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+h3 { font-size: 18px; margin: 24px 0 8px; color: var(--accent); }
+h4 { font-size: 16px; margin: 20px 0 8px; color: var(--text-muted); }
+p { margin: 8px 0; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+strong { color: var(--text); font-weight: 600; }
+code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace; }
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; overflow-x: auto; margin: 12px 0;
+}
+pre code {
+  background: none; padding: 0; font-size: 13px; line-height: 1.5;
+  color: var(--text); display: block;
+}
+.kw { color: var(--kw); }
+.str { color: var(--str); }
+.cmt { color: var(--cmt); font-style: italic; }
+.typ { color: var(--typ); }
+.bi { color: var(--bi); }
+.num { color: var(--num); }
+.atr { color: var(--atr); }
+.table-wrap { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { background: var(--surface2); color: var(--text); font-weight: 600; text-align: left; }
+th, td { padding: 8px 12px; border: 1px solid var(--border); }
+td { color: var(--text-muted); }
+tr:hover td { background: var(--surface2); color: var(--text); }
+blockquote {
+  border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0;
+  background: var(--surface2); border-radius: 0 8px 8px 0; color: var(--text-muted);
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+ul, ol { padding-left: 24px; margin: 8px 0; }
+li { margin: 4px 0; color: var(--text-muted); }
+.checkbox-item {
+  padding: 12px 16px; margin: 8px 0; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.checkbox-item input[type="checkbox"] { margin-right: 8px; }
+.step-title { font-weight: 600; color: var(--text); }
+.step-detail { margin-top: 8px; padding-left: 28px; }
+.section { display: none; }
+.section.active { display: block; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-milestone { background: #1f6feb33; color: #58a6ff; }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border); }
+  .main { margin-left: 0; padding: 16px; }
+  .nav-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px; }
+  .nav-link { padding: 4px 12px; border-left: none; border-radius: 4px; }
+  .milestones { display: none; }
+}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+<div class="sidebar-header"><h2>Go Agent Harness</h2></div>
+<ul class="nav-list">
+<li><a href="index.html" class="nav-link">Overview</a></li>
+<li><a href="task-01-llm-abstraction.html" class="nav-link active">Task 1: LLM Abstraction</a></li>
+<li><a href="task-02-s01-agent-loop.html" class="nav-link">Task 2: Agent Loop</a></li>
+<li><a href="task-03-s02-tool-use.html" class="nav-link">Task 3: Tool Use</a></li>
+<li><a href="task-04-s03-todo-write.html" class="nav-link">Task 4: Todo Write</a></li>
+<li><a href="task-05-s04-subagent.html" class="nav-link">Task 5: Subagent</a></li>
+<li><a href="task-06-s05-skill-loading.html" class="nav-link">Task 6: Skill Loading</a></li>
+<li><a href="task-07-s06-context-compact.html" class="nav-link">Task 7: Context Compact</a></li>
+<li><a href="task-08-s07-task-system.html" class="nav-link">Task 8: Task System</a></li>
+<li><a href="task-09-s08-background-tasks.html" class="nav-link">Task 9: Background Tasks</a></li>
+<li><a href="task-10-s09-agent-teams.html" class="nav-link">Task 10: Agent Teams</a></li>
+<li><a href="task-11-s10-team-protocols.html" class="nav-link">Task 11: Team Protocols</a></li>
+<li><a href="task-12-s11-autonomous-agents.html" class="nav-link">Task 12: Autonomous</a></li>
+<li><a href="task-13-s12-worktree-isolation.html" class="nav-link">Task 13: Worktree</a></li>
+<li><a href="task-14-sfull-readme.html" class="nav-link">Task 14: Capstone</a></li>
+</ul>
+<div class="milestones">
+<h3>Milestones</h3>
+<div class="ms"><span class="ms-label ms-a">A</span> Task 1-4</div>
+<div class="ms"><span class="ms-label ms-b">B</span> Task 5-7</div>
+<div class="ms"><span class="ms-label ms-c">C</span> Task 8-9</div>
+<div class="ms"><span class="ms-label ms-d">D</span> Task 10-12</div>
+<div class="ms"><span class="ms-label ms-e">E</span> Task 13-14</div>
+</div>
+</nav>
+<main class="main">
+
+<h1>Task 1: 初始化 Go 项目与 LLM 抽象</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> 无</p></blockquote>
+
+<p><strong>Goal:</strong> 创建 Go module 并实现多 provider LLM client 层，支持 OpenAI Responses、OpenAI Chat、Anthropic-compatible、DeepSeek，所有 adapter 使用 <code>httptest.Server</code> 测试，不访问真实网络。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>这一节先不急着实现 agent 行为，而是先做“模型连接层”。Agent 的每一步都要问一次模型：现在看到这些消息和工具，你下一步要说话还是调用工具？如果这层直接散落在业务代码里，后面每加一个机制都要重新处理 API 请求、响应解析、错误和测试。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>Message：</strong>对话历史中的一条记录。用户输入、助手回复、工具结果都会变成 message，agent loop 靠它们让模型知道刚才发生了什么。</li>
+<li><strong>ToolSpec：</strong>告诉模型“有哪些工具可以用、参数长什么样”。模型不会真的执行工具，它只会输出一个结构化的 tool call。</li>
+<li><strong>Response：</strong>模型返回的内容，可能是普通文本，也可能是 tool_use。后续循环会根据 <code>stop_reason</code> 决定是否执行工具。</li>
+<li><strong>FakeClient：</strong>测试用的假模型。它让我们不用真实 API key，也能验证 loop、工具分发和状态机。</li></ul>
+
+<h3>为什么这样拆</h3>
+<p><code>internal/llm</code> 只负责协议转换，不知道 agent、任务、文件系统或团队协作。这样后续从 OpenAI Responses 换成 OpenAI-compatible Chat 或 DeepSeek adapter 时，agent 主流程不需要改。第一次读代码时，可以把这层看成“模型插座”：外面接不同 provider，里面统一输出 Go 结构体。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能解释一次 LLM 调用需要哪些输入、模型如何表达“我要调用工具”、为什么业务测试必须依赖 fake client，以及为什么 provider adapter 不能执行工具。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/go.mod</code></li>
+<li>Create: <code>go-agent/internal/llm/types.go</code></li>
+<li>Create: <code>go-agent/internal/llm/config.go</code></li>
+<li>Create: <code>go-agent/internal/llm/client_factory.go</code></li>
+<li>Create: <code>go-agent/internal/llm/openai_responses.go</code></li>
+<li>Create: <code>go-agent/internal/llm/openai_chat.go</code></li>
+<li>Create: <code>go-agent/internal/llm/anthropic_compat.go</code></li>
+<li>Create: <code>go-agent/internal/llm/deepseek.go</code></li>
+<li>Create: <code>go-agent/internal/llm/fake.go</code></li>
+<li>Test: <code>go-agent/internal/llm/fake_test.go</code></li>
+<li>Test: <code>go-agent/internal/llm/config_test.go</code></li>
+<li>Test: <code>go-agent/internal/llm/openai_responses_test.go</code></li>
+<li>Test: <code>go-agent/internal/llm/openai_chat_test.go</code></li>
+<li>Test: <code>go-agent/internal/llm/anthropic_compat_test.go</code></li></ul>
+
+<hr>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 初始化模块**</span>
+<div class="step-detail">
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> mod init learn-claude-code-<span class="kw">go</span>
+<span class="kw">go</span> get gopkg.in/yaml.v3@latest</code></pre>
+
+<p>Expected: <code>go.mod</code> 存在，module 为 <code>learn-claude-code-go</code>。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 写 <code>llm</code> 类型、配置解析与 fake client 测试**</span>
+<div class="step-detail">
+<p>类型定义见 overview 核心数据模型中的 <code>internal/llm/types.go</code> 和 <code>internal/llm/config.go</code>。</p>
+
+<p>测试覆盖：</p>
+<ul><li><code>FakeClient</code> 按顺序返回预设响应；响应耗尽时返回错误。</li>
+<li><code>DefaultConfigFromEnv()</code> 可解析 OpenAI GPT-5.5：</li></ul>
+
+<pre><code class="lang-bash">AGENT_LLM_PROVIDER=openai
+AGENT_LLM_API_STYLE=openai_responses
+AGENT_MODEL=gpt-5.5
+OPENAI_API_KEY=<span class="kw">test</span>-key</code></pre>
+
+<ul><li><code>DefaultConfigFromEnv()</code> 可解析 DeepSeek V4 Pro：</li></ul>
+
+<pre><code class="lang-bash">AGENT_LLM_PROVIDER=deepseek
+AGENT_LLM_API_STYLE=anthropic_messages
+AGENT_MODEL=deepseek-v4-pro
+DEEPSEEK_API_KEY=<span class="kw">test</span>-key</code></pre>
+
+<ul><li>缺少 provider 对应 API key 时返回清晰错误。</li></ul>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/llm</code></pre>
+
+<p>Expected: PASS。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现 OpenAI Responses adapter**</span>
+<div class="step-detail">
+<p>要求：</p>
+<ul><li>从 <code>OPENAI_API_KEY</code> 读取 key。</li>
+<li><code>OPENAI_BASE_URL</code> 可覆盖，默认 <code>https://api.openai.com</code>。</li>
+<li>请求 <code>POST <base>/v1/responses</code>。</li>
+<li><code>ToolSpec</code> 转为 OpenAI function tool。</li>
+<li><code>ContentBlock{Type:"tool_use"}</code> 转为 Responses API 续轮输入。</li>
+<li>工具执行结果转为 <code>function_call_output</code>，并绑定正确 <code>call_id</code>。</li>
+<li><code>reasoning.effort</code> 从 <code>AGENT_REASONING_EFFORT</code> 读取，默认 <code>medium</code>。</li>
+<li><code>store</code> 默认 <code>false</code>，避免教学 CLI 无意保存响应。</li>
+<li>失败响应返回包含 status code 和 body 的 error。</li></ul>
+
+<p>请求结构：</p>
+
+<pre><code class="lang-go"><span class="kw">type</span> openAIResponsesRequest <span class="kw">struct</span> {
+	Model           <span class="typ">string</span>           <span class="str">`json:&quot;model&quot;`</span>
+	Instructions    <span class="typ">string</span>           <span class="str">`json:&quot;instructions,omitempty&quot;`</span>
+	Input           []<span class="kw">map</span>[<span class="typ">string</span>]any <span class="str">`json:&quot;input&quot;`</span>
+	Tools           []<span class="kw">map</span>[<span class="typ">string</span>]any <span class="str">`json:&quot;tools,omitempty&quot;`</span>
+	MaxOutputTokens <span class="typ">int</span>              <span class="str">`json:&quot;max_output_tokens,omitempty&quot;`</span>
+	Reasoning       <span class="kw">map</span>[<span class="typ">string</span>]any   <span class="str">`json:&quot;reasoning,omitempty&quot;`</span>
+	Store           <span class="typ">bool</span>             <span class="str">`json:&quot;store&quot;`</span>
+}</code></pre>
+
+<p>工具 schema 转换：</p>
+
+<pre><code class="lang-go"><span class="kw">func</span> toOpenAIFunctionTools(specs []ToolSpec) []<span class="kw">map</span>[<span class="typ">string</span>]any {
+	tools := <span class="bi">make</span>([]<span class="kw">map</span>[<span class="typ">string</span>]any, 0, <span class="bi">len</span>(specs))
+	<span class="kw">for</span> _, spec := <span class="kw">range</span> specs {
+		tools = <span class="bi">append</span>(tools, <span class="kw">map</span>[<span class="typ">string</span>]any{
+			<span class="str">&quot;<span class="kw">type</span>&quot;</span>:        <span class="str">&quot;function&quot;</span>,
+			<span class="str">&quot;name&quot;</span>:        spec.Name,
+			<span class="str">&quot;description&quot;</span>: spec.Description,
+			<span class="str">&quot;parameters&quot;</span>:  spec.InputSchema,
+		})
+	}
+	<span class="kw">return</span> tools
+}</code></pre>
+
+<p>响应转换规则：</p>
+<ul><li><code>output[].type == "function_call"</code> -> <code>ContentBlock{Type:"tool_use", ID: call_id, Name: name, Input: parsed arguments}</code>。</li>
+<li><code>output[].type == "message"</code> 中的文本 -> <code>ContentBlock{Type:"text", Text: text}</code>。</li>
+<li>只要存在 function call，统一返回 <code>StopReason: "tool_use"</code>。</li>
+<li>reasoning items：保留在 provider transcript 中；当 OpenAI 返回需要回传的 reasoning item 时，下一轮 Responses input 必须包含上一轮 output item 和本地 <code>function_call_output</code> item。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现 OpenAI Chat adapter**</span>
+<div class="step-detail">
+<p>要求：</p>
+<ul><li>请求 <code>POST <base>/v1/chat/completions</code>。</li>
+<li>system prompt 转为首条 <code>role=system</code>。</li>
+<li><code>ToolSpec</code> 转为 Chat Completions <code>tools: [{type:"function", function:{...}}]</code>。</li>
+<li><code>finish_reason == "tool_calls"</code> 映射为 <code>StopReason: "tool_use"</code>。</li>
+<li><code>tool_calls[].function.arguments</code> 必须用 <code>encoding/json</code> 解析为 <code>map[string]any</code>。</li>
+<li><code>llm.Message{Role:"user", Content: []ToolResult}</code> 转为 <code>role=tool</code> messages；<code>tool_call_id</code> 使用 <code>ToolUseID</code>。</li>
+<li>assistant <code>tool_calls</code> 转为本项目 <code>tool_use</code>。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 Anthropic-compatible adapter**</span>
+<div class="step-detail">
+<p>要求：</p>
+<ul><li>支持标准 Anthropic endpoint 或兼容 endpoint。</li>
+<li>DeepSeek 默认 base URL 使用 <code>https://api.deepseek.com/anthropic</code>。</li>
+<li>请求 <code>/v1/messages</code>。</li>
+<li>默认 header 包含兼容 Anthropic 的 <code>anthropic-version: 2023-06-01</code>。</li>
+<li><code>tool_use/tool_result</code> 与内部模型一一映射。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现 DeepSeek provider wrapper**</span>
+<div class="step-detail">
+<p>要求：</p>
+<ul><li><code>Provider=deepseek</code> 且 <code>APIStyle=anthropic_messages</code> 时创建 <code>AnthropicCompatClient</code>。</li>
+<li><code>Provider=deepseek</code> 且 <code>APIStyle=openai_chat</code> 时创建 <code>OpenAIChatClient</code>。</li>
+<li>默认模型为 <code>deepseek-v4-pro</code>。</li>
+<li>默认 API style 为 <code>anthropic_messages</code>。</li>
+<li><code>deepseek-v4-flash</code> 作为 README 中的低成本示例，不作为默认值。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 实现 client factory**</span>
+<div class="step-detail">
+<pre><code class="lang-go"><span class="kw">func</span> NewClient(cfg Config, httpClient *http.Client) (Client, <span class="typ">error</span>)</code></pre>
+
+<p>路由规则：</p>
+<ul><li><code>openai + openai_responses</code> -> <code>OpenAIResponsesClient</code>。</li>
+<li><code>openai + openai_chat</code> -> <code>OpenAIChatClient</code>。</li>
+<li><code>deepseek + anthropic_messages</code> -> <code>DeepSeekClient</code> 包装 <code>AnthropicCompatClient</code>。</li>
+<li><code>deepseek + openai_chat</code> -> <code>DeepSeekClient</code> 包装 <code>OpenAIChatClient</code>。</li>
+<li>不支持的 provider/style 组合返回错误，错误中列出允许组合。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 8: 运行 LLM 层测试**</span>
+<div class="step-detail">
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/llm</code></pre>
+
+<p>Expected: PASS。测试使用 <code>httptest.Server</code>，不得访问真实网络。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 9: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/<span class="kw">go</span>.mod <span class="kw">go</span>-agent/<span class="kw">go</span>.sum <span class="kw">go</span>-agent/internal/llm
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add multi-provider llm clients&quot;</span></code></pre>
+</div>
+</div>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Go Agent 技术方案与实施计划</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f4eb;
+      --paper: #fffdf8;
+      --text: #18221c;
+      --muted: #5f6c64;
+      --line: #d9dccf;
+      --accent: #1a6b57;
+      --accent-soft: rgba(26, 107, 87, 0.1);
+      --accent-warn: #9d4636;
+      --shadow: 0 14px 36px rgba(24, 34, 28, 0.06);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --serif: Georgia, "Times New Roman", "Noto Serif SC", serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        linear-gradient(90deg, rgba(26, 107, 87, 0.05) 1px, transparent 1px),
+        linear-gradient(rgba(26, 107, 87, 0.035) 1px, transparent 1px),
+        var(--bg);
+      background-size: 30px 30px;
+      font-family: var(--serif);
+      line-height: 1.7;
+    }
+
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+    .wrap {
+      width: min(1280px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 64px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.4fr 0.8fr;
+      gap: 20px;
+      align-items: end;
+      padding: 24px 0 30px;
+      border-bottom: 2px solid var(--text);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--accent-warn);
+      font: 700 13px/1.2 var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(38px, 5.6vw, 74px);
+      line-height: 0.98;
+      letter-spacing: 0;
+      max-width: 13ch;
+    }
+
+    .summary {
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+      max-width: 64ch;
+    }
+
+    .hero aside {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: var(--shadow);
+    }
+
+    .meta {
+      margin: 0;
+      display: grid;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .meta strong { color: var(--text); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 24px;
+      margin-top: 26px;
+      align-items: start;
+    }
+
+    nav {
+      position: sticky;
+      top: 18px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.8);
+      box-shadow: var(--shadow);
+    }
+
+    nav h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    nav ol {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    nav li { margin: 6px 0; }
+
+    .content {
+      display: grid;
+      gap: 18px;
+    }
+
+    section {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.84);
+      box-shadow: var(--shadow);
+    }
+
+    section h2 {
+      margin: 0 0 12px;
+      font-size: 26px;
+      line-height: 1.15;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 19px;
+      line-height: 1.25;
+    }
+
+    p { margin: 0 0 12px; }
+
+    ul, ol { margin: 10px 0 12px; padding-left: 20px; }
+    li { margin: 6px 0; }
+
+    code, pre {
+      font-family: var(--mono);
+      font-size: 0.95em;
+    }
+
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(26, 107, 87, 0.16);
+    }
+
+    pre {
+      margin: 12px 0 0;
+      padding: 14px 16px;
+      overflow-x: auto;
+      border-radius: 6px;
+      background: #19221d;
+      color: #f5f1e7;
+      line-height: 1.6;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .card {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(250, 248, 241, 0.88);
+    }
+
+    .badge {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      font: 700 12px/1 var(--mono);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .commit {
+      border-top: 1px solid var(--line);
+      padding-top: 18px;
+      margin-top: 18px;
+    }
+
+    .commit:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    .commit header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .commit header .tag {
+      font-family: var(--mono);
+      color: var(--accent-warn);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .commit header h3 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 8px;
+    }
+
+    .checklist div {
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgba(26, 107, 87, 0.06);
+      border: 1px solid rgba(26, 107, 87, 0.12);
+    }
+
+    .footer {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 980px) {
+      .hero, .layout { grid-template-columns: 1fr; }
+      nav { position: static; }
+    }
+
+    @media (max-width: 640px) {
+      .wrap { width: min(100% - 18px, 1280px); padding-top: 14px; }
+      .hero { padding-top: 14px; }
+      section { padding: 14px; }
+      section h2 { font-size: 22px; }
+      h1 { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <p class="eyebrow">Technical Design / Review Draft</p>
+        <h1>Go 版本 Agent 技术方案与实施计划</h1>
+        <p class="summary">
+          目标是把 <code>/Users/hejianglong/Desktop/github/learn-claude-code/docs/zh</code> 的 12 篇能力文档，逐章实现为一个功能完备、可测试、可持续演进的 Go agent。
+          这个方案明确每个 commit 的边界、文件职责、验证方式和风险点，方便你逐项审核。
+        </p>
+      </div>
+      <aside>
+        <p class="meta"><strong>计划约束</strong> 每篇文档对应一个 commit</p>
+        <p class="meta"><strong>入口</strong> <code>index.html</code> -> <code>docs/index.html</code> -> <code>docs/technical-plan.html</code></p>
+        <p class="meta"><strong>测试策略</strong> 所有核心行为用 Go 单测覆盖，LLM 用 fake client 隔离</p>
+        <p class="meta"><strong>状态目录</strong> <code>.tasks/</code> <code>.team/</code> <code>.worktrees/</code> <code>.transcripts/</code></p>
+      </aside>
+    </div>
+
+    <div class="layout">
+      <nav>
+        <h2>目录</h2>
+        <ol>
+          <li><a href="#scope">目标与边界</a></li>
+          <li><a href="#architecture">架构分层</a></li>
+          <li><a href="#files">文件与职责</a></li>
+          <li><a href="#runtime">运行时流程</a></li>
+          <li><a href="#testing">测试策略</a></li>
+          <li><a href="#plan">12 个 commit 计划</a></li>
+          <li><a href="#risks">风险与决策点</a></li>
+          <li><a href="#acceptance">验收标准</a></li>
+        </ol>
+      </nav>
+
+      <div class="content">
+        <section id="scope">
+          <h2>1. 目标与边界</h2>
+          <p>本项目不是把 12 篇文档简单翻译成 Go，而是实现一条真实可运行的 agent 演进链路。</p>
+          <div class="grid">
+            <div class="card">
+              <span class="badge">目标</span>
+              <p>实现从单循环 agent 到任务图、后台执行、团队协作、自治认领和 worktree 隔离的完整链路。</p>
+            </div>
+            <div class="card">
+              <span class="badge">非目标</span>
+              <p>不在首轮加入 GUI、不做分布式数据库、不追求多模型兼容层，不把所有能力先做成可插拔平台。</p>
+            </div>
+            <div class="card">
+              <span class="badge">约束</span>
+              <p>测试必须可离线运行；所有网络依赖都要可替换；每个 commit 都要可回滚、可验证。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="architecture">
+          <h2>2. 架构分层</h2>
+          <p>实现采用三层结构：执行循环层、工具与状态层、协作与持久化层。前两层支撑 s01-s06，第三层承接 s07-s12。</p>
+          <div class="grid">
+            <div class="card">
+              <h3>执行循环层</h3>
+              <p>负责消息驱动、LLM 调用、tool_use 分发、subagent、压缩和提醒注入。</p>
+            </div>
+            <div class="card">
+              <h3>工具与状态层</h3>
+              <p>负责 bash、文件读写、todo、skill、task、background 等能力的实现和沙箱控制。</p>
+            </div>
+            <div class="card">
+              <h3>协作与持久化层</h3>
+              <p>负责任务图、队友生命周期、消息总线、请求-响应协议、自治认领和 worktree 绑定。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="files">
+          <h2>3. 文件与职责</h2>
+          <p>以下文件边界会在实现里固定下来，避免把所有逻辑堆在一个大包里。</p>
+          <div class="grid">
+            <div class="card">
+              <h3><code>cmd/go-agent/main.go</code></h3>
+              <p>CLI 入口、参数解析、配置加载和启动 agent。</p>
+            </div>
+            <div class="card">
+              <h3><code>internal/llm/</code></h3>
+              <p>定义模型接口、Anthropic 实现、fake 实现和测试夹具。</p>
+            </div>
+            <div class="card">
+              <h3><code>internal/agent/</code></h3>
+              <p>维护消息循环、上下文压缩、subagent、idle/work 状态切换。</p>
+            </div>
+            <div class="card">
+              <h3><code>internal/tools/</code></h3>
+              <p>工具注册与分发、每个工具的输入输出契约、统一错误包装。</p>
+            </div>
+            <div class="card">
+              <h3><code>internal/state/</code></h3>
+              <p>磁盘状态读写：todo、task、team、transcripts、worktrees。</p>
+            </div>
+            <div class="card">
+              <h3><code>docs/</code></h3>
+              <p>总入口、详细方案和后续 12 篇章节文档，作为实现和审阅的可读输出。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="runtime">
+          <h2>4. 运行时流程</h2>
+          <ol>
+            <li>CLI 读取配置，初始化工作目录、状态目录和 LLM client。</li>
+            <li>主循环将用户输入写入 messages，调用 LLM，解析返回内容。</li>
+            <li>如果出现 tool_use，按名称查找 handler，执行后把结果追加回 messages。</li>
+            <li>如果没有 tool_use，结束当前轮并返回文本输出。</li>
+            <li>在 s03 以后加入 todo reminder，在 s06 以后加入压缩，在 s08 以后加入后台通知 drain。</li>
+          </ol>
+          <pre>user -> agent loop -> llm -> tool dispatch -> tool_result -> llm -> ... -> final text</pre>
+        </section>
+
+        <section id="testing">
+          <h2>5. 测试策略</h2>
+          <p>测试按能力分层，而不是只做一条大烟囱测试。关键行为都要有单元测试，跨模块行为在每个 commit 后补一条最小集成测试。</p>
+          <div class="grid">
+            <div class="card">
+              <h3>单元测试</h3>
+              <p>工具解析、沙箱路径、状态转换、协议 FSM、压缩逻辑、任务图依赖解除。</p>
+            </div>
+            <div class="card">
+              <h3>集成测试</h3>
+              <p>fake LLM 驱动 agent loop，验证 tool_result 回写、子 agent 摘要、后台通知和 inbox 注入。</p>
+            </div>
+            <div class="card">
+              <h3>文件系统测试</h3>
+              <p>临时目录里验证 .tasks、.team、.worktrees、.transcripts 的真实落盘和恢复。</p>
+            </div>
+          </div>
+          <p class="footer">固定验证命令：<code>go test ./...</code> 和 <code>go run ./cmd/go-agent --help</code>。</p>
+        </section>
+
+        <section id="plan">
+          <h2>6. 12 个 commit 的详细计划</h2>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s01</span>
+              <h3><code>feat: implement s01 agent loop</code></h3>
+            </header>
+            <p>先做最小可运行闭环：消息列表、tool_use 解析、单一 bash 工具、可退出循环。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>cmd/go-agent/main.go</code>、<code>internal/agent/loop.go</code>、<code>internal/llm/client.go</code>、<code>internal/tools/bash.go</code>、<code>internal/tools/registry.go</code></div>
+              <div><strong>测试</strong> fake client 返回 tool_use 后继续循环；非 tool_use 时退出；bash 输出被转成 tool_result。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s01-agent-loop.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s02</span>
+              <h3><code>feat: implement s02 tool dispatch</code></h3>
+            </header>
+            <p>把 shell 之外的读写编辑拆成专用工具，用统一 dispatch map 管理工具注册，补路径沙箱。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/tools/files.go</code>、<code>internal/state/sandbox.go</code>、<code>internal/tools/registry.go</code>。</div>
+              <div><strong>测试</strong> 路径逃逸报错；读写编辑正确；未知工具返回可读错误；loop 本体不改。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s02-tool-use.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s03</span>
+              <h3><code>feat: implement s03 todo write</code></h3>
+            </header>
+            <p>引入内存内 TodoManager，让模型先写计划再执行，并在连续几轮未更新时注入提醒。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/tools/todo.go</code>、<code>internal/agent/reminder.go</code>、<code>internal/agent/loop.go</code>。</div>
+              <div><strong>测试</strong> 仅允许一个 in_progress；3 轮未更新后注入 reminder；todo 渲染顺序稳定。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s03-todo-write.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s04</span>
+              <h3><code>feat: implement s04 subagents</code></h3>
+            </header>
+            <p>把长任务拆到独立上下文，子 agent 只返回摘要，不污染父上下文。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/agent/subagent.go</code>、<code>internal/tools/task.go</code>。</div>
+              <div><strong>测试</strong> 父子 messages 分离；子 agent 可以调用基础工具但不能递归 spawn；摘要作为 tool_result 返回。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s04-subagent.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s05</span>
+              <h3><code>feat: implement s05 skill loading</code></h3>
+            </header>
+            <p>通过 skill loader 扫描本地 skills 目录，系统提示只放摘要，完整内容按需注入。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/state/skills.go</code>、<code>internal/tools/skill.go</code>。</div>
+              <div><strong>测试</strong> frontmatter 解析；未知 skill 返回错误；系统提示只包含名称和描述；完整内容包裹在 skill 标签内。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s05-skill-loading.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s06</span>
+              <h3><code>feat: implement s06 context compaction</code></h3>
+            </header>
+            <p>把旧消息压缩成占位符，触发阈值后自动压缩，并把完整 transcript 落盘。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/agent/compaction.go</code>、<code>internal/state/transcripts.go</code>、<code>internal/tools/compact.go</code>。</div>
+              <div><strong>测试</strong> 旧 tool_result 被替换；超过阈值触发 auto compact；transcript 文件内容可重建上下文。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s06-context-compact.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s07</span>
+              <h3><code>feat: implement s07 task system</code></h3>
+            </header>
+            <p>把内存 todo 升级成磁盘任务图，开始承载长期目标和依赖关系。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/state/tasks.go</code>、<code>internal/tools/task.go</code>、<code>internal/agent/loop.go</code>。</div>
+              <div><strong>测试</strong> create/update/list/get；blockedBy 解除；完成任务后后继任务自动解锁；重启后状态不丢失。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s07-task-system.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s08</span>
+              <h3><code>feat: implement s08 background tasks</code></h3>
+            </header>
+            <p>把慢命令丢到后台线程执行，前台 agent 继续思考，结果在下一轮前注入。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/tools/background.go</code>、<code>internal/state/background.go</code>、<code>internal/agent/loop.go</code>。</div>
+              <div><strong>测试</strong> run 返回 task id；check 可查询状态；通知队列在 drain 后为空；超时路径可覆盖。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s08-background-tasks.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s09</span>
+              <h3><code>feat: implement s09 agent teams</code></h3>
+            </header>
+            <p>引入持久队友和 JSONL inbox，让多个 agent 通过文件协作。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/state/team.go</code>、<code>internal/tools/team.go</code>、<code>internal/agent/team_loop.go</code>。</div>
+              <div><strong>测试</strong> spawn 后名册更新；send 追加 JSONL；read_inbox 会 drain；broadcast 可覆盖多个接收者。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s09-agent-teams.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s10</span>
+              <h3><code>feat: implement s10 team protocols</code></h3>
+            </header>
+            <p>把关机和计划审批统一成 request-response 协议，保证协商可追踪、可拒绝、可恢复。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/tools/protocol.go</code>、<code>internal/state/protocols.go</code>。</div>
+              <div><strong>测试</strong> request_id 贯通 request/response；approve/reject 状态转换准确；关闭流程不留下半截状态。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s10-team-protocols.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s11</span>
+              <h3><code>feat: implement s11 autonomous agents</code></h3>
+            </header>
+            <p>队友进入自治循环：空闲时轮询 inbox 和任务板，发现可认领任务就自动开工。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/agent/autonomous.go</code>、<code>internal/state/tasks.go</code>、<code>internal/state/team.go</code>。</div>
+              <div><strong>测试</strong> 自动认领未分配任务；blocked 任务不会被认领；压缩后身份可重注入；空闲超时会退出。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s11-autonomous-agents.html</code>。</div>
+            </div>
+          </article>
+
+          <article class="commit">
+            <header>
+              <span class="tag">s12</span>
+              <h3><code>feat: implement s12 worktree task isolation</code></h3>
+            </header>
+            <p>把任务和 worktree 一一绑定，确保并行修改不会相互污染，收尾时能显式 keep 或 remove。</p>
+            <div class="checklist">
+              <div><strong>文件</strong> <code>internal/state/worktrees.go</code>、<code>internal/tools/worktree.go</code>、<code>internal/state/events.go</code>。</div>
+              <div><strong>测试</strong> 临时 git repo 中创建/运行/删除 worktree；remove 时可自动完成任务；事件流落盘可回放。</div>
+              <div><strong>文档</strong> 生成 <code>docs/s12-worktree-task-isolation.html</code>。</div>
+            </div>
+          </article>
+        </section>
+
+        <section id="risks">
+          <h2>7. 风险与决策点</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>LLM 依赖</h3>
+              <p>生产环境使用的模型和 API 形状需要尽早定死，否则后面所有消息和工具协议都会漂移。</p>
+            </div>
+            <div class="card">
+              <h3>文件系统复杂度</h3>
+              <p>task/team/worktree/transcript 四套状态都落盘，必须保持目录边界清晰，避免互相污染。</p>
+            </div>
+            <div class="card">
+              <h3>测试成本</h3>
+              <p>背景线程、worktree 和协议 FSM 都要有可重复的集成测试，不然重构后很难判断回归点。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="acceptance">
+          <h2>8. 验收标准</h2>
+          <ul>
+            <li>12 个 commit 能一一对应 12 篇文档，且每个 commit 都能独立通过测试。</li>
+            <li><code>go test ./...</code> 通过，<code>go run ./cmd/go-agent --help</code> 可运行。</li>
+            <li>根目录 <code>index.html</code>、<code>docs/index.html</code>、<code>docs/technical-plan.html</code> 都可打开并互相可达。</li>
+            <li>所有磁盘状态目录在空工作区下可初始化、可恢复、可清理。</li>
+          </ul>
+          <p class="footer">如果这份方案通过审核，下一步就按 12 个 commit 顺序开始实现。</p>
+        </section>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

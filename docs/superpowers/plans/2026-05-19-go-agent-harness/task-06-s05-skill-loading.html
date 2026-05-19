@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task 6: Skill Loading - Go Agent Harness</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #7ee787;
+  --kw: #ff7b72;
+  --str: #a5d6ff;
+  --cmt: #8b949e;
+  --typ: #79c0ff;
+  --bi: #d2a8ff;
+  --num: #79c0ff;
+  --atr: #d2a8ff;
+  --sidebar-w: 260px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text);
+  line-height: 1.6; font-size: 15px;
+}
+.sidebar {
+  position: fixed; top: 0; left: 0;
+  width: var(--sidebar-w); height: 100vh;
+  background: var(--surface); border-right: 1px solid var(--border);
+  overflow-y: auto; z-index: 100;
+  padding: 20px 0;
+}
+.sidebar-header { padding: 0 20px 16px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.sidebar-header h2 { font-size: 16px; color: var(--accent); }
+.nav-list { list-style: none; }
+.nav-list li { margin: 0; }
+.nav-link {
+  display: block; padding: 6px 20px; color: var(--text-muted);
+  text-decoration: none; font-size: 13px; transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.nav-link:hover { color: var(--text); background: var(--surface2); }
+.nav-link.active { color: var(--accent); border-left-color: var(--accent); background: var(--surface2); }
+.milestones { padding: 16px 20px; border-top: 1px solid var(--border); margin-top: 16px; }
+.milestones h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+.ms { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.ms-label {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px; font-weight: 700; font-size: 11px;
+}
+.ms-a { background: #1f6feb33; color: #58a6ff; }
+.ms-b { background: #238636aa; color: #7ee787; }
+.ms-c { background: #9e6a03aa; color: #d29922; }
+.ms-d { background: #8957e5aa; color: #d2a8ff; }
+.ms-e { background: #da3633aa; color: #ff7b72; }
+.main {
+  margin-left: var(--sidebar-w);
+  padding: 32px 40px;
+  max-width: 960px;
+}
+h1 { font-size: 28px; margin-bottom: 8px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+h2 { font-size: 22px; margin: 32px 0 12px; color: var(--text); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+h3 { font-size: 18px; margin: 24px 0 8px; color: var(--accent); }
+h4 { font-size: 16px; margin: 20px 0 8px; color: var(--text-muted); }
+p { margin: 8px 0; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+strong { color: var(--text); font-weight: 600; }
+code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace; }
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; overflow-x: auto; margin: 12px 0;
+}
+pre code {
+  background: none; padding: 0; font-size: 13px; line-height: 1.5;
+  color: var(--text); display: block;
+}
+.kw { color: var(--kw); }
+.str { color: var(--str); }
+.cmt { color: var(--cmt); font-style: italic; }
+.typ { color: var(--typ); }
+.bi { color: var(--bi); }
+.num { color: var(--num); }
+.atr { color: var(--atr); }
+.table-wrap { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { background: var(--surface2); color: var(--text); font-weight: 600; text-align: left; }
+th, td { padding: 8px 12px; border: 1px solid var(--border); }
+td { color: var(--text-muted); }
+tr:hover td { background: var(--surface2); color: var(--text); }
+blockquote {
+  border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0;
+  background: var(--surface2); border-radius: 0 8px 8px 0; color: var(--text-muted);
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+ul, ol { padding-left: 24px; margin: 8px 0; }
+li { margin: 4px 0; color: var(--text-muted); }
+.checkbox-item {
+  padding: 12px 16px; margin: 8px 0; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.checkbox-item input[type="checkbox"] { margin-right: 8px; }
+.step-title { font-weight: 600; color: var(--text); }
+.step-detail { margin-top: 8px; padding-left: 28px; }
+.section { display: none; }
+.section.active { display: block; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-milestone { background: #1f6feb33; color: #58a6ff; }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border); }
+  .main { margin-left: 0; padding: 16px; }
+  .nav-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px; }
+  .nav-link { padding: 4px 12px; border-left: none; border-radius: 4px; }
+  .milestones { display: none; }
+}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+<div class="sidebar-header"><h2>Go Agent Harness</h2></div>
+<ul class="nav-list">
+<li><a href="index.html" class="nav-link">Overview</a></li>
+<li><a href="task-01-llm-abstraction.html" class="nav-link">Task 1: LLM Abstraction</a></li>
+<li><a href="task-02-s01-agent-loop.html" class="nav-link">Task 2: Agent Loop</a></li>
+<li><a href="task-03-s02-tool-use.html" class="nav-link">Task 3: Tool Use</a></li>
+<li><a href="task-04-s03-todo-write.html" class="nav-link">Task 4: Todo Write</a></li>
+<li><a href="task-05-s04-subagent.html" class="nav-link">Task 5: Subagent</a></li>
+<li><a href="task-06-s05-skill-loading.html" class="nav-link active">Task 6: Skill Loading</a></li>
+<li><a href="task-07-s06-context-compact.html" class="nav-link">Task 7: Context Compact</a></li>
+<li><a href="task-08-s07-task-system.html" class="nav-link">Task 8: Task System</a></li>
+<li><a href="task-09-s08-background-tasks.html" class="nav-link">Task 9: Background Tasks</a></li>
+<li><a href="task-10-s09-agent-teams.html" class="nav-link">Task 10: Agent Teams</a></li>
+<li><a href="task-11-s10-team-protocols.html" class="nav-link">Task 11: Team Protocols</a></li>
+<li><a href="task-12-s11-autonomous-agents.html" class="nav-link">Task 12: Autonomous</a></li>
+<li><a href="task-13-s12-worktree-isolation.html" class="nav-link">Task 13: Worktree</a></li>
+<li><a href="task-14-sfull-readme.html" class="nav-link">Task 14: Capstone</a></li>
+</ul>
+<div class="milestones">
+<h3>Milestones</h3>
+<div class="ms"><span class="ms-label ms-a">A</span> Task 1-4</div>
+<div class="ms"><span class="ms-label ms-b">B</span> Task 5-7</div>
+<div class="ms"><span class="ms-label ms-c">C</span> Task 8-9</div>
+<div class="ms"><span class="ms-label ms-d">D</span> Task 10-12</div>
+<div class="ms"><span class="ms-label ms-e">E</span> Task 13-14</div>
+</div>
+</nav>
+<main class="main">
+
+<h1>Task 6: 实现 s05 Skill 加载</h1>
+
+<blockquote><p><strong>Prerequisites:</strong> Task 3 (文件工具和路径沙箱)</p></blockquote>
+
+<p><strong>Goal:</strong> 实现按需 skill 加载，从磁盘扫描 <code>skills/**/SKILL.md</code>，解析 YAML frontmatter，通过 <code>load_skill</code> 工具注入完整 skill 内容。</p>
+
+<h2>给第一次接触 Agent 的读者</h2>
+
+<p>源教程 s05 讨论“知识什么时候给模型”。如果把所有工作流、代码审查清单、框架说明都塞进 system prompt，模型每一轮都要带着大量无关 token。Skill loading 的做法是先只告诉模型有哪些 skill，等模型真的需要时再加载完整内容。</p>
+
+<h3>新手先懂这几个概念</h3>
+<ul><li><strong>Skill 描述层：</strong>系统提示中只放名称和一句描述，成本低，帮助模型知道可选能力。</li>
+<li><strong>Skill 内容层：</strong>模型调用 <code>load_skill</code> 后，完整 <code>SKILL.md</code> 通过 tool_result 进入上下文。</li>
+<li><strong>Frontmatter：</strong><code>SKILL.md</code> 顶部的 YAML 元数据，用来声明 name、description 等可索引信息。</li>
+<li><strong>按需注入：</strong>不是 harness 主动猜，而是让模型根据任务显式请求。</li></ul>
+
+<h3>和源教程的对应关系</h3>
+<p>源 s05 使用两层提示模型。本任务用 <code>internal/skills/loader.go</code> 扫描磁盘 skill，用 <code>gopkg.in/yaml.v3</code> 解析 frontmatter，再注册 <code>load_skill</code> 工具。</p>
+
+<h3>完成后应该理解</h3>
+<p>你应该能解释为什么 skill 不是普通配置文件：它是可被模型按需加载的操作指南。好的 skill loading 让 agent 拥有更多领域能力，同时不让每轮上下文膨胀。</p>
+
+<hr>
+
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code>go-agent/internal/skills/loader.go</code></li>
+<li>Create: <code>go-agent/cmd/s05-skill-loading/main.go</code></li>
+<li>Copy/Create: <code>go-agent/skills/*/SKILL.md</code></li>
+<li>Test: <code>go-agent/internal/skills/loader_test.go</code></li></ul>
+
+<hr>
+
+<h2>Steps</h2>
+
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 复制示例 skills**</span>
+<div class="step-detail">
+<p>从 <code>/Users/hejianglong/Desktop/github/learn-claude-code/skills</code> 复制到 <code>go-agent/skills</code>，保持目录名不变。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 写 loader 测试**</span>
+<div class="step-detail">
+<p>覆盖：</p>
+<ul><li>递归扫描 <code>SKILL.md</code>。</li>
+<li>YAML frontmatter 中 <code>name</code> 优先于目录名。</li>
+<li><code>Descriptions()</code> 只输出名称和 description。</li>
+<li><code>Load("missing")</code> 返回 unknown skill 错误文本。</li></ul>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现 loader**</span>
+<div class="step-detail">
+<p>使用 <code>gopkg.in/yaml.v3</code> 解析 frontmatter。<code>Load(name)</code> 返回：</p>
+
+<pre><code class="lang-xml"><span class="kw">&lt;skill</span> <span class="atr">name</span>=<span class="str">&quot;code-review&quot;</span><span class="kw">&gt;</span>
+...
+<span class="kw">&lt;/skill</span><span class="kw">&gt;</span></code></pre>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 注册 <code>load_skill</code> 工具**</span>
+<div class="step-detail">
+<p>system prompt 包含：</p>
+
+<pre><code class="lang-text">Skills available:
+  - agent-builder: ...
+  - code-review: ...</code></pre>
+
+<p>完整 Skill 内容只通过 tool result 注入。</p>
+
+<p>Run:</p>
+
+<pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
+<span class="kw">go</span> <span class="kw">test</span> ./internal/skills
+<span class="kw">go</span> run ./cmd/s05-skill-loading <span class="str">&quot;What skills are available?&quot;</span></code></pre>
+
+<p>Expected: 测试 PASS；CLI 能列出可用 skill。</p>
+</div>
+</div>
+<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 提交**</span>
+<div class="step-detail">
+<pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/skills <span class="kw">go</span>-agent/skills <span class="kw">go</span>-agent/cmd/s05-skill-loading <span class="kw">go</span>-agent/<span class="kw">go</span>.mod <span class="kw">go</span>-agent/<span class="kw">go</span>.sum
+<span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add on-demand skill loading&quot;</span></code></pre>
+</div>
+</div>
+
+</main>
+</body>
+</html>
