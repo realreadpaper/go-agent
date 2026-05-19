@@ -156,6 +156,66 @@ func TestLoopTraceRedactsSecretsFromToolInputsAndResults(t *testing.T) {
 	}
 }
 
+func TestTodoNagInjectsReminderAfterThreshold(t *testing.T) {
+	client := &scriptedClient{responses: []llm.Response{
+		{StopReason: "tool_use", Content: []llm.ContentBlock{{Type: "tool_use", ID: "tool-1", Name: "bash"}}},
+		{StopReason: "tool_use", Content: []llm.ContentBlock{{Type: "tool_use", ID: "tool-2", Name: "bash"}}},
+		{StopReason: "end_turn", Content: []llm.ContentBlock{{Type: "text", Text: "done"}}},
+	}}
+	tools := &scriptedTools{outputs: map[string]string{"bash": "ok"}}
+	nag := WithTodoNag(2)
+	loop := &Loop{
+		Client:     client,
+		Tools:      tools,
+		MaxRounds:  4,
+		BeforeCall: []BeforeCallHook{nag.BeforeCall},
+		AfterTool:  []AfterToolHook{nag.AfterTool},
+	}
+
+	_, _, err := loop.Run([]llm.Message{{Role: "user", Content: "work"}})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	if len(client.requests) != 3 {
+		t.Fatalf("request count = %d, want 3", len(client.requests))
+	}
+	got, ok := client.requests[2].Messages[len(client.requests[2].Messages)-1].Content.(string)
+	if !ok {
+		t.Fatalf("last request message content type = %T, want string reminder", client.requests[2].Messages[len(client.requests[2].Messages)-1].Content)
+	}
+	if !strings.Contains(got, "<reminder>Update your todos.</reminder>") {
+		t.Fatalf("reminder message = %q", got)
+	}
+}
+
+func TestTodoNagResetsAfterTodoTool(t *testing.T) {
+	client := &scriptedClient{responses: []llm.Response{
+		{StopReason: "tool_use", Content: []llm.ContentBlock{{Type: "tool_use", ID: "tool-1", Name: "todo"}}},
+		{StopReason: "tool_use", Content: []llm.ContentBlock{{Type: "tool_use", ID: "tool-2", Name: "bash"}}},
+		{StopReason: "end_turn", Content: []llm.ContentBlock{{Type: "text", Text: "done"}}},
+	}}
+	tools := &scriptedTools{outputs: map[string]string{"todo": "[>] Work", "bash": "ok"}}
+	nag := WithTodoNag(2)
+	loop := &Loop{
+		Client:     client,
+		Tools:      tools,
+		MaxRounds:  4,
+		BeforeCall: []BeforeCallHook{nag.BeforeCall},
+		AfterTool:  []AfterToolHook{nag.AfterTool},
+	}
+
+	_, _, err := loop.Run([]llm.Message{{Role: "user", Content: "work"}})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	lastMessage := client.requests[2].Messages[len(client.requests[2].Messages)-1]
+	if text, ok := lastMessage.Content.(string); ok && strings.Contains(text, "<reminder>") {
+		t.Fatalf("unexpected reminder after todo tool: %q", text)
+	}
+}
+
 func TestLoopRunsToolAndAppendsToolResultBeforeFinalResponse(t *testing.T) {
 	client := &scriptedClient{responses: []llm.Response{
 		{
