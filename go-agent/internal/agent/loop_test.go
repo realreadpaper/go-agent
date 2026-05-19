@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -34,6 +35,88 @@ func (t *scriptedTools) Specs() []llm.ToolSpec {
 func (t *scriptedTools) Run(name string, input map[string]any) string {
 	t.calls = append(t.calls, name)
 	return t.outputs[name]
+}
+
+func TestLoopWritesTraceForRoundsAndToolCalls(t *testing.T) {
+	client := &scriptedClient{responses: []llm.Response{
+		{
+			StopReason: "tool_use",
+			Content: []llm.ContentBlock{{
+				Type:  "tool_use",
+				ID:    "tool-1",
+				Name:  "bash",
+				Input: map[string]any{"command": "git branch --show-current"},
+			}},
+		},
+		{
+			StopReason: "end_turn",
+			Content:    []llm.ContentBlock{{Type: "text", Text: "main"}},
+		},
+	}}
+	tools := &scriptedTools{outputs: map[string]string{"bash": "main\n"}}
+	var trace bytes.Buffer
+	loop := &Loop{
+		Client:    client,
+		Tools:     tools,
+		MaxRounds: 4,
+		Trace:     &trace,
+	}
+
+	_, _, err := loop.Run([]llm.Message{{Role: "user", Content: "branch"}})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	out := trace.String()
+	for _, want := range []string{
+		"[agent] round=1",
+		"stop_reason=tool_use",
+		"tool_use name=bash id=tool-1",
+		"tool_result name=bash chars=5",
+		"[agent] round=2",
+		"stop_reason=end_turn",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("trace output missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestLoopTraceRedactsSecretsFromToolInputsAndResults(t *testing.T) {
+	secret := "sk-" + "testsecret1234567890"
+	client := &scriptedClient{responses: []llm.Response{
+		{
+			StopReason: "tool_use",
+			Content: []llm.ContentBlock{{
+				Type:  "tool_use",
+				ID:    "tool-1",
+				Name:  "bash",
+				Input: map[string]any{"command": "echo " + secret},
+			}},
+		},
+		{StopReason: "end_turn"},
+	}}
+	tools := &scriptedTools{outputs: map[string]string{"bash": "OPENAI_API_KEY=" + secret + "\n"}}
+	var trace bytes.Buffer
+	loop := &Loop{
+		Client:    client,
+		Tools:     tools,
+		MaxRounds: 4,
+		Trace:     &trace,
+	}
+
+	_, _, err := loop.Run([]llm.Message{{Role: "user", Content: "secret"}})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	out := trace.String()
+	if strings.Contains(out, secret) {
+		t.Fatalf("trace output leaked secret:\n%s", out)
+	}
+	if !strings.Contains(out, "sk-<redacted>") || !strings.Contains(out, "OPENAI_API_KEY=<redacted>") {
+		t.Fatalf("trace output did not include redaction markers:\n%s", out)
+	}
 }
 
 func TestLoopRunsToolAndAppendsToolResultBeforeFinalResponse(t *testing.T) {

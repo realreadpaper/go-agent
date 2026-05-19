@@ -2,11 +2,18 @@ package agent
 
 import (
 	"fmt"
+	"io"
+	"regexp"
 
 	"learn-claude-code-go/internal/llm"
 )
 
 const maxToolResultChars = 50000
+
+var (
+	apiKeyAssignmentPattern = regexp.MustCompile(`(?i)([A-Z0-9_]*API[_-]?KEY=)[^\s"'<>]+`)
+	skSecretPattern         = regexp.MustCompile(`sk-[A-Za-z0-9_-]{8,}`)
+)
 
 // BeforeCallHook 在每次请求 LLM 前运行。
 // 后续章节会用它注入 todo reminder、上下文压缩摘要、队友身份等 harness 状态。
@@ -35,6 +42,9 @@ type Loop struct {
 	MaxRounds  int
 	BeforeCall []BeforeCallHook
 	AfterTool  []AfterToolHook
+	// Trace 是可选调试输出。CLI 可以把它接到 stderr，让读者看到每轮模型调用和工具执行过程；
+	// 库调用或单元测试保持 nil 时完全静默，不影响最终回答的 stdout。
+	Trace io.Writer
 }
 
 // Run 从已有 messages 开始执行 agent loop，并返回完整 transcript 与最后一次 LLM 响应。
@@ -47,6 +57,7 @@ func (l *Loop) Run(messages []llm.Message) ([]llm.Message, llm.Response, error) 
 	}
 
 	for i := 0; i < rounds; i++ {
+		l.tracef("[agent] round=%d messages=%d\n", i+1, len(messages))
 		// BeforeCall hook 是“请求模型前”的统一扩展点。
 		// 这让后续功能可以通过改写 messages 注入提醒或摘要，而不必改动主循环。
 		for _, hook := range l.BeforeCall {
@@ -59,6 +70,7 @@ func (l *Loop) Run(messages []llm.Message) ([]llm.Message, llm.Response, error) 
 		if l.Tools != nil {
 			specs = l.Tools.Specs()
 		}
+		l.tracef("[agent] request model=%s tools=%d max_tokens=%d\n", l.Model, len(specs), l.MaxTokens)
 		// 每轮都把完整消息历史和当前可用工具 schema 发给 LLM。
 		// provider adapter 只负责协议转换，不能在这里或 adapter 里直接执行工具。
 		var err error
@@ -72,6 +84,7 @@ func (l *Loop) Run(messages []llm.Message) ([]llm.Message, llm.Response, error) 
 		if err != nil {
 			return messages, resp, err
 		}
+		l.tracef("[agent] response stop_reason=%s blocks=%d\n", resp.StopReason, len(resp.Content))
 		// assistant message 必须保留原始 tool_use block。
 		// 下一轮 provider adapter 需要它把工具结果和正确的 tool_use id 对上。
 		messages = append(messages, llm.Message{Role: "assistant", Content: resp.Content})
@@ -84,6 +97,7 @@ func (l *Loop) Run(messages []llm.Message) ([]llm.Message, llm.Response, error) 
 			if block.Type != "tool_use" {
 				continue
 			}
+			l.tracef("[agent] tool_use name=%s id=%s input=%s\n", block.Name, block.ID, summarizeMap(block.Input, 500))
 			// 只有 harness 可以执行工具。未知工具、handler error、空输出都由 Registry 统一格式化为字符串，
 			// 这样模型总能收到一个 tool_result，而不是让 Go error 打断整个对话。
 			output := "Error: no tools registered"
@@ -95,6 +109,7 @@ func (l *Loop) Run(messages []llm.Message) ([]llm.Message, llm.Response, error) 
 			if len(output) > maxToolResultChars {
 				output = output[:maxToolResultChars]
 			}
+			l.tracef("[agent] tool_result name=%s chars=%d preview=%q\n", block.Name, len(output), summarizeString(output, 300))
 			for _, hook := range l.AfterTool {
 				hook(block.Name)
 			}
@@ -110,4 +125,34 @@ func (l *Loop) Run(messages []llm.Message) ([]llm.Message, llm.Response, error) 
 	}
 
 	return messages, resp, fmt.Errorf("agent loop exceeded MaxRounds=%d", rounds)
+}
+
+func (l *Loop) tracef(format string, args ...any) {
+	if l.Trace == nil {
+		return
+	}
+	_, _ = fmt.Fprintf(l.Trace, format, args...)
+}
+
+func summarizeMap(input map[string]any, limit int) string {
+	if input == nil {
+		return "{}"
+	}
+	return summarizeString(fmt.Sprintf("%v", input), limit)
+}
+
+func summarizeString(text string, limit int) string {
+	text = redactSecrets(text)
+	if len(text) <= limit {
+		return text
+	}
+	if limit <= 3 {
+		return text[:limit]
+	}
+	return text[:limit-3] + "..."
+}
+
+func redactSecrets(text string) string {
+	text = apiKeyAssignmentPattern.ReplaceAllString(text, `${1}<redacted>`)
+	return skSecretPattern.ReplaceAllString(text, "sk-<redacted>")
 }
