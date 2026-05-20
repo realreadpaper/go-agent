@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"learn-claude-code-go/internal/tools"
 )
@@ -91,11 +92,11 @@ func TestRegisterToolUpdatesManagerFromToolInput(t *testing.T) {
 	}
 }
 
-func TestPersistentManagerWritesUniqueTodoFiles(t *testing.T) {
+func TestPersistentManagerKeepsOnlyFinalTodoFileForOneRun(t *testing.T) {
 	workdir := t.TempDir()
 	manager := NewPersistentManager(workdir)
 
-	firstOut, err := manager.Update([]Item{{Content: "Plan persistence", Status: StatusInProgress}})
+	_, err := manager.Update([]Item{{Content: "Plan persistence", Status: StatusInProgress}})
 	if err != nil {
 		t.Fatalf("first Update returned error: %v", err)
 	}
@@ -109,35 +110,47 @@ func TestPersistentManagerWritesUniqueTodoFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadDir(%s) returned error: %v", storeDir, err)
 	}
-	if len(entries) != 2 {
-		t.Fatalf("todo snapshot count = %d, want 2", len(entries))
-	}
-	if entries[0].Name() == entries[1].Name() {
-		t.Fatalf("snapshot filenames must be unique, got %q twice", entries[0].Name())
+	if len(entries) != 1 {
+		t.Fatalf("todo snapshot count = %d, want 1 final file", len(entries))
 	}
 
-	var snapshots []snapshotFile
-	for _, entry := range entries {
-		data, err := os.ReadFile(filepath.Join(storeDir, entry.Name()))
-		if err != nil {
-			t.Fatalf("ReadFile(%s) returned error: %v", entry.Name(), err)
-		}
-		var snapshot snapshotFile
-		if err := json.Unmarshal(data, &snapshot); err != nil {
-			t.Fatalf("snapshot %s is not valid JSON: %v\n%s", entry.Name(), err, data)
-		}
-		if snapshot.CreatedAt == "" {
-			t.Fatalf("snapshot %s missing created_at", entry.Name())
-		}
-		snapshots = append(snapshots, snapshot)
+	data, err := os.ReadFile(filepath.Join(storeDir, entries[0].Name()))
+	if err != nil {
+		t.Fatalf("ReadFile(%s) returned error: %v", entries[0].Name(), err)
 	}
+	var snapshot snapshotFile
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		t.Fatalf("snapshot %s is not valid JSON: %v\n%s", entries[0].Name(), err, data)
+	}
+	if snapshot.CreatedAt == "" {
+		t.Fatalf("snapshot %s missing created_at", entries[0].Name())
+	}
+	if snapshot.Rendered != secondOut {
+		t.Fatalf("rendered snapshot = %q, want final output %q", snapshot.Rendered, secondOut)
+	}
+	if len(snapshot.Items) != 1 || snapshot.Items[0].Content != "Verify files" {
+		t.Fatalf("snapshot items = %+v, want final todo only", snapshot.Items)
+	}
+}
 
-	rendered := snapshots[0].Rendered + "\n" + snapshots[1].Rendered
-	if !strings.Contains(rendered, firstOut) || !strings.Contains(rendered, secondOut) {
-		t.Fatalf("snapshot rendered output missing updates:\n%s", rendered)
+func TestFormatSnapshotTimeUsesReadableLocalStyle(t *testing.T) {
+	ts := time.Date(2026, 5, 20, 10, 53, 11, 86_022_000, time.FixedZone("CST", 8*60*60))
+
+	got := formatSnapshotTime(ts)
+
+	want := "2026-05-20 10:53:11 +08:00"
+	if got != want {
+		t.Fatalf("formatSnapshotTime() = %q, want %q", got, want)
 	}
-	contents := snapshots[0].Items[0].Content + "\n" + snapshots[1].Items[0].Content
-	if !strings.Contains(contents, "Plan persistence") || !strings.Contains(contents, "Verify files") {
-		t.Fatalf("snapshot items missing todo contents:\n%s", contents)
+}
+
+func TestFormatSnapshotFileNameUsesReadableLocalStyle(t *testing.T) {
+	ts := time.Date(2026, 5, 20, 10, 59, 28, 46_967_000, time.FixedZone("CST", 8*60*60))
+
+	got := formatSnapshotFileName(ts)
+
+	want := "todo-2026-05-20-10-59-28-046967.json"
+	if got != want {
+		t.Fatalf("formatSnapshotFileName() = %q, want %q", got, want)
 	}
 }

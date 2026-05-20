@@ -29,13 +29,13 @@ type Item struct {
 
 // Manager 保存一次 agent 会话内的 todo 状态。
 // 默认 NewManager 只在内存中保存，适合单元测试和不需要落盘的演示。
-// NewPersistentManager 会额外把每次 TodoWrite 的完整快照写入 .goagent/todo，
-// 这样第一次学习 agent 的读者可以打开文件，看到模型如何一步步维护计划。
+// NewPersistentManager 会把本次运行的最终 TodoWrite 状态写入 .goagent/todo。
+// 中间过程由 CLI 日志展示，文件里只保留最后一次 todo，避免初学者被历史快照干扰。
 type Manager struct {
-	mu       sync.Mutex
-	items    []Item
-	storeDir string
-	seq      uint64
+	mu        sync.Mutex
+	items     []Item
+	storeDir  string
+	storeFile string
 }
 
 func NewManager() *Manager {
@@ -44,9 +44,13 @@ func NewManager() *Manager {
 
 // NewPersistentManager 创建会把 todo 快照落盘的 Manager。
 // workdir 通常是当前项目目录；最终文件会写到 workdir/.goagent/todo/。
-// 每次 Update 都生成一个新文件，不覆盖旧文件，便于复盘 agent 的计划变化历史。
+// 一个 Manager 对应一次运行；多次 Update 会覆盖同一个文件，只留下最终状态。
 func NewPersistentManager(workdir string) *Manager {
-	return &Manager{storeDir: filepath.Join(workdir, ".goagent", "todo")}
+	now := time.Now()
+	return &Manager{
+		storeDir:  filepath.Join(workdir, ".goagent", "todo"),
+		storeFile: formatSnapshotFileName(now),
+	}
 }
 
 func (m *Manager) StoreDir() string {
@@ -91,12 +95,11 @@ func (m *Manager) Update(items []Item) (string, error) {
 	m.items = validated
 	rendered := render(validated)
 	storeDir := m.storeDir
-	m.seq++
-	seq := m.seq
+	storeFile := m.storeFile
 	snapshotItems := append([]Item(nil), validated...)
 	m.mu.Unlock()
 	if storeDir != "" {
-		if err := writeSnapshot(storeDir, seq, snapshotItems, rendered); err != nil {
+		if err := writeSnapshot(storeDir, storeFile, snapshotItems, rendered); err != nil {
 			return "", err
 		}
 	}
@@ -135,13 +138,13 @@ type snapshotFile struct {
 	Rendered  string `json:"rendered"`
 }
 
-func writeSnapshot(storeDir string, seq uint64, items []Item, rendered string) error {
+func writeSnapshot(storeDir, storeFile string, items []Item, rendered string) error {
 	if err := os.MkdirAll(storeDir, 0o755); err != nil {
 		return fmt.Errorf("create todo store: %w", err)
 	}
-	now := time.Now().UTC()
+	now := time.Now()
 	snapshot := snapshotFile{
-		CreatedAt: now.Format(time.RFC3339Nano),
+		CreatedAt: formatSnapshotTime(now),
 		Items:     items,
 		Rendered:  rendered,
 	}
@@ -151,21 +154,20 @@ func writeSnapshot(storeDir string, seq uint64, items []Item, rendered string) e
 	}
 	data = append(data, '\n')
 
-	name := fmt.Sprintf("%s-p%d-%06d.json", now.Format("20060102T150405.000000000Z"), os.Getpid(), seq)
-	path := filepath.Join(storeDir, name)
-	return writeFileNew(path, data)
-}
-
-func writeFileNew(path string, data []byte) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if err != nil {
-		return fmt.Errorf("write todo snapshot: %w", err)
-	}
-	defer file.Close()
-	if _, err := file.Write(data); err != nil {
+	path := filepath.Join(storeDir, storeFile)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return fmt.Errorf("write todo snapshot: %w", err)
 	}
 	return nil
+}
+
+func formatSnapshotTime(t time.Time) string {
+	return t.Local().Format("2006-01-02 15:04:05 -07:00")
+}
+
+func formatSnapshotFileName(t time.Time) string {
+	local := t.Local()
+	return fmt.Sprintf("todo-%s-%06d.json", local.Format("2006-01-02-15-04-05"), local.Nanosecond()/1_000)
 }
 
 // Register 把 todo 工具接入通用 tools.Registry。
