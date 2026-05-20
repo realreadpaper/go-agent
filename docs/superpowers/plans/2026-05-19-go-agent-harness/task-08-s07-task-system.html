@@ -162,7 +162,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 
 <blockquote><p><strong>Prerequisites:</strong> Task 2 (agent loop)</p></blockquote>
 
-<p><strong>Goal:</strong> 实现持久任务图，任务保存为 <code>.tasks/task_N.json</code>，支持 <code>blockedBy</code> 依赖、状态转换和自动解锁。</p>
+<p><strong>Goal:</strong> 实现持久任务图，任务保存为 <code>.tasks/task_N.json</code>，支持 <code>blockedBy</code> 依赖、状态机驱动的状态转换和自动解锁。</p>
 
 <h2>给第一次接触 Agent 的读者</h2>
 
@@ -171,14 +171,14 @@ li { margin: 4px 0; color: var(--text-muted); }
 <h3>新手先懂这几个概念</h3>
 <ul><li><strong>任务图：</strong>任务之间可以有依赖关系，不是单纯列表。A 完成后，B 和 C 可能同时解锁。</li>
 <li><strong><code>blockedBy</code>：</strong>一个任务被哪些前置任务阻塞。为空且状态为 pending 的任务就是 ready。</li>
-<li><strong>状态转换：</strong><code>pending -> in_progress -> completed</code> 让 agent 和测试都能判断任务处于哪一步。</li>
+<li><strong>状态机：</strong>任务状态不是随便写字符串，而是通过本地转换表校验。合法转换才会落盘，非法转换会返回清晰错误。</li>
 <li><strong>磁盘持久化：</strong>每个任务一个 JSON 文件，方便恢复，也方便后续多个 agent 通过文件协调。</li></ul>
 
 <h3>和源教程的对应关系</h3>
-<p>源 s07 把任务保存到 <code>.tasks/</code> 并提供 create/update/list/get 工具。本任务用 <code>internal/tasks/manager.go</code> 实现同样的 CRUD、依赖解除和 ready 列表，给 s08 之后的并发与团队协作打基础。</p>
+<p>源 s07 把任务保存到 <code>.tasks/</code> 并提供 create/update/list/get 工具。本任务用 <code>internal/tasks/manager.go</code> 实现同样的 CRUD、依赖解除和 ready 列表，给 s08 之后的并发与团队协作打基础。状态转换必须通过本地 Go 转换表完成，不引入外部状态机依赖，便于教学读者直接读懂规则。</p>
 
 <h3>完成后应该理解</h3>
-<p>你应该能区分 Todo 和 Task：Todo 是当前会话的短期计划，Task 是长期、可恢复、可分配的工作单元。后面的后台任务、团队和 worktree 都会围绕 Task 运转。</p>
+<p>你应该能区分 Todo 和 Task：Todo 是当前会话的短期计划，Task 是长期、可恢复、可分配的工作单元。后面的后台任务、团队和 worktree 都会围绕 Task 运转。你还应该能解释为什么这里需要状态机：长期任务会被多个 agent 或多次运行更新，只有显式转换表才能避免 <code>completed</code> 被误改回 <code>pending</code> 这类不可靠状态。</p>
 
 <hr>
 
@@ -201,7 +201,9 @@ li { margin: 4px 0; color: var(--text-muted); }
 <ul><li><code>Create</code> 生成递增 ID。</li>
 <li><code>Update(id, completed)</code> 自动从其他任务 <code>blockedBy</code> 移除该 ID。</li>
 <li><code>ListReady()</code> 只返回 <code>pending</code>、无 owner、<code>blockedBy</code> 为空的任务。</li>
-<li>状态仅允许 <code>pending</code>、<code>in_progress</code>、<code>completed</code>。</li></ul>
+<li>状态仅允许 <code>pending</code>、<code>in_progress</code>、<code>completed</code>。</li>
+<li>状态转换必须走状态机：<code>pending -> in_progress</code>、<code>pending -> completed</code>、<code>in_progress -> pending</code>、<code>in_progress -> completed</code> 合法；<code>completed</code> 是终态，不能再转回其他状态。</li>
+<li>重复设置相同状态是幂等操作，不应触发错误或重复副作用。</li></ul>
 </div>
 </div>
 <div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现任务模型**</span>
@@ -217,6 +219,23 @@ li { margin: 4px 0; color: var(--text-muted); }
 }</code></pre>
 
 <p>每个任务保存为 <code>.tasks/task_<id>.json</code>。</p>
+<p>状态机转换表本地存储在 Go 代码中，例如：</p>
+<pre><code class="lang-go"><span class="kw">var</span> allowedTransitions = <span class="kw">map</span>[<span class="typ">string</span>]<span class="kw">map</span>[<span class="typ">string</span>]<span class="typ">bool</span>{
+	StatusPending: {
+		StatusInProgress: <span class="kw">true</span>,
+		StatusCompleted:  <span class="kw">true</span>,
+	},
+	StatusInProgress: {
+		StatusPending:   <span class="kw">true</span>,
+		StatusCompleted: <span class="kw">true</span>,
+	},
+	StatusCompleted: {},
+}</code></pre>
+<p>实现要求：</p>
+<ul><li><code>Transition(current, next)</code> 负责校验状态值和转换边。</li>
+<li><code>current == next</code> 视为幂等成功。</li>
+<li>非法转换必须返回包含当前状态和目标状态的错误。</li>
+<li>只有成功转换到 <code>completed</code> 后，才执行依赖解锁 action。</li></ul>
 </div>
 </div>
 <div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 注册工具**</span>
