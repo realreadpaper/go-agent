@@ -3,8 +3,11 @@ package todo
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"learn-claude-code-go/internal/tools"
 )
@@ -25,14 +28,31 @@ type Item struct {
 }
 
 // Manager 保存一次 agent 会话内的 todo 状态。
-// 这是短期规划板，不负责跨进程恢复；后续持久任务系统会处理长期任务。
+// 默认 NewManager 只在内存中保存，适合单元测试和不需要落盘的演示。
+// NewPersistentManager 会额外把每次 TodoWrite 的完整快照写入 .goagent/todo，
+// 这样第一次学习 agent 的读者可以打开文件，看到模型如何一步步维护计划。
 type Manager struct {
-	mu    sync.Mutex
-	items []Item
+	mu       sync.Mutex
+	items    []Item
+	storeDir string
+	seq      uint64
 }
 
 func NewManager() *Manager {
 	return &Manager{}
+}
+
+// NewPersistentManager 创建会把 todo 快照落盘的 Manager。
+// workdir 通常是当前项目目录；最终文件会写到 workdir/.goagent/todo/。
+// 每次 Update 都生成一个新文件，不覆盖旧文件，便于复盘 agent 的计划变化历史。
+func NewPersistentManager(workdir string) *Manager {
+	return &Manager{storeDir: filepath.Join(workdir, ".goagent", "todo")}
+}
+
+func (m *Manager) StoreDir() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.storeDir
 }
 
 // Update 校验并替换整个 todo 列表。
@@ -70,7 +90,16 @@ func (m *Manager) Update(items []Item) (string, error) {
 	m.mu.Lock()
 	m.items = validated
 	rendered := render(validated)
+	storeDir := m.storeDir
+	m.seq++
+	seq := m.seq
+	snapshotItems := append([]Item(nil), validated...)
 	m.mu.Unlock()
+	if storeDir != "" {
+		if err := writeSnapshot(storeDir, seq, snapshotItems, rendered); err != nil {
+			return "", err
+		}
+	}
 	return rendered, nil
 }
 
@@ -96,6 +125,47 @@ func render(items []Item) string {
 		lines = append(lines, marker+" "+item.Content)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// snapshotFile 是写入 .goagent/todo 的教学快照格式。
+// items 保存结构化 todo，rendered 保存 CLI 中看到的人类可读文本。
+type snapshotFile struct {
+	CreatedAt string `json:"created_at"`
+	Items     []Item `json:"items"`
+	Rendered  string `json:"rendered"`
+}
+
+func writeSnapshot(storeDir string, seq uint64, items []Item, rendered string) error {
+	if err := os.MkdirAll(storeDir, 0o755); err != nil {
+		return fmt.Errorf("create todo store: %w", err)
+	}
+	now := time.Now().UTC()
+	snapshot := snapshotFile{
+		CreatedAt: now.Format(time.RFC3339Nano),
+		Items:     items,
+		Rendered:  rendered,
+	}
+	data, err := json.MarshalIndent(snapshot, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode todo snapshot: %w", err)
+	}
+	data = append(data, '\n')
+
+	name := fmt.Sprintf("%s-p%d-%06d.json", now.Format("20060102T150405.000000000Z"), os.Getpid(), seq)
+	path := filepath.Join(storeDir, name)
+	return writeFileNew(path, data)
+}
+
+func writeFileNew(path string, data []byte) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return fmt.Errorf("write todo snapshot: %w", err)
+	}
+	defer file.Close()
+	if _, err := file.Write(data); err != nil {
+		return fmt.Errorf("write todo snapshot: %w", err)
+	}
+	return nil
 }
 
 // Register 把 todo 工具接入通用 tools.Registry。

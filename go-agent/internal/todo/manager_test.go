@@ -1,6 +1,9 @@
 package todo
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -85,5 +88,56 @@ func TestRegisterToolUpdatesManagerFromToolInput(t *testing.T) {
 	}
 	if !strings.Contains(out, "[ ] Plan") || !strings.Contains(out, "[>] Code") {
 		t.Fatalf("todo tool output = %q", out)
+	}
+}
+
+func TestPersistentManagerWritesUniqueTodoFiles(t *testing.T) {
+	workdir := t.TempDir()
+	manager := NewPersistentManager(workdir)
+
+	firstOut, err := manager.Update([]Item{{Content: "Plan persistence", Status: StatusInProgress}})
+	if err != nil {
+		t.Fatalf("first Update returned error: %v", err)
+	}
+	secondOut, err := manager.Update([]Item{{Content: "Verify files", Status: StatusCompleted}})
+	if err != nil {
+		t.Fatalf("second Update returned error: %v", err)
+	}
+
+	storeDir := filepath.Join(workdir, ".goagent", "todo")
+	entries, err := os.ReadDir(storeDir)
+	if err != nil {
+		t.Fatalf("ReadDir(%s) returned error: %v", storeDir, err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("todo snapshot count = %d, want 2", len(entries))
+	}
+	if entries[0].Name() == entries[1].Name() {
+		t.Fatalf("snapshot filenames must be unique, got %q twice", entries[0].Name())
+	}
+
+	var snapshots []snapshotFile
+	for _, entry := range entries {
+		data, err := os.ReadFile(filepath.Join(storeDir, entry.Name()))
+		if err != nil {
+			t.Fatalf("ReadFile(%s) returned error: %v", entry.Name(), err)
+		}
+		var snapshot snapshotFile
+		if err := json.Unmarshal(data, &snapshot); err != nil {
+			t.Fatalf("snapshot %s is not valid JSON: %v\n%s", entry.Name(), err, data)
+		}
+		if snapshot.CreatedAt == "" {
+			t.Fatalf("snapshot %s missing created_at", entry.Name())
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+
+	rendered := snapshots[0].Rendered + "\n" + snapshots[1].Rendered
+	if !strings.Contains(rendered, firstOut) || !strings.Contains(rendered, secondOut) {
+		t.Fatalf("snapshot rendered output missing updates:\n%s", rendered)
+	}
+	contents := snapshots[0].Items[0].Content + "\n" + snapshots[1].Items[0].Content
+	if !strings.Contains(contents, "Plan persistence") || !strings.Contains(contents, "Verify files") {
+		t.Fatalf("snapshot items missing todo contents:\n%s", contents)
 	}
 }

@@ -46,7 +46,9 @@ func main() {
 	reg := tools.NewRegistry()
 	tools.RegisterBash(reg, workdir)
 	tools.RegisterFileTools(reg, workdir)
-	todoManager := todo.NewManager()
+	// 真实运行时使用持久化 Manager：每次模型调用 TodoWrite，都会在 .goagent/todo/
+	// 生成一份独立 JSON 快照。这样可以复盘 agent 为什么做某一步，也能确认计划没有被覆盖。
+	todoManager := todo.NewPersistentManager(workdir)
 	todo.Register(reg, todoManager)
 	nag := agent.WithTodoNag(3)
 
@@ -61,7 +63,7 @@ func main() {
 		AfterTool:  []agent.AfterToolHook{nag.AfterTool},
 		Trace:      os.Stderr,
 	}
-	fmt.Fprintf(os.Stderr, "[s03] workdir=%s prompt=%q\n", workdir, prompt)
+	fmt.Fprintf(os.Stderr, "[s03] workdir=%s todo_store=%s prompt=%q\n", workdir, todoManager.StoreDir(), prompt)
 	_, resp, err := loop.Run([]llm.Message{{Role: "user", Content: prompt}})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "agent error: %v\n", err)
