@@ -197,7 +197,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 
 <h2>Steps</h2>
 
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写 MessageBus 测试**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 1: 写 MessageBus 测试**</span>
 <div class="step-detail">
 <p>覆盖：</p>
 <ul><li><code>Send</code> append JSON line 到 <code>.team/inbox/<to>.jsonl</code>。</li>
@@ -205,7 +205,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <li>空 inbox 返回 <code>[]</code>。</li></ul>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 team config**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 2: 实现 team config**</span>
 <div class="step-detail">
 <p><code>.team/config.json</code>：</p>
 
@@ -214,15 +214,16 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>manager 内存中维护 goroutine cancel 函数和状态锁。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现队友 loop**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 3: 实现队友 loop**</span>
 <div class="step-detail">
 <p>每个队友：</p>
 <ul><li>独立 messages。</li>
 <li>每次 LLM 调用前读自己的 inbox。</li>
 <li>结束时状态改为 <code>idle</code>。</li></ul>
+<p>实现中 <code>cmd/s09-agent-teams</code> 的 <code>teammateRunner</code> 会为每个队友创建独立 <code>agent.Loop</code>，并通过 <code>BeforeCall</code> hook 把未读 inbox 注入为 <code>&lt;team-inbox&gt;</code>。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 注册团队工具**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 4: 注册团队工具**</span>
 <div class="step-detail">
 <p>工具：</p>
 <ul><li><code>spawn_teammate(name, role, prompt)</code></li>
@@ -232,7 +233,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <li><code>read_inbox(name)</code></li></ul>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 s09 CLI**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 5: 实现 s09 CLI**</span>
 <div class="step-detail">
 <p>支持 REPL 命令：</p>
 <ul><li><code>/team</code> 输出 config。</li>
@@ -247,7 +248,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: <code>.team/config.json</code> 和 <code>.team/inbox/*.jsonl</code> 可观察。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
 <div class="step-detail">
 <p>无网络验证要覆盖队友配置、inbox JSONL、消息投递和 goroutine 生命周期：</p>
 <pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
@@ -259,7 +260,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: <code>.team/config.json</code> 记录队友；<code>.team/inbox/bob.jsonl</code> 出现消息；停止队友后 goroutine 能退出。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/cmd/s09-agent-teams
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add persistent agent teams&quot;</span></code></pre>

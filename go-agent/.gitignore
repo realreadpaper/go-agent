@@ -1,4 +1,5 @@
 .env
 .goagent/
+.team/
 .transcripts/
 .tasks/
