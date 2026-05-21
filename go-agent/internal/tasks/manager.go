@@ -59,6 +59,7 @@ type UpdateInput struct {
 	RemoveBlockedBy []int
 	Owner           string
 	Worktree        string
+	ClearWorktree   bool
 }
 
 // Manager 管理 .tasks 目录中的任务图。
@@ -165,6 +166,9 @@ func (m *Manager) Update(input UpdateInput) (Task, error) {
 	if input.Worktree != "" {
 		task.Worktree = strings.TrimSpace(input.Worktree)
 	}
+	if input.ClearWorktree {
+		task.Worktree = ""
+	}
 	m.tasks[task.ID] = task
 	if err := m.persistLocked(task); err != nil {
 		return Task{}, err
@@ -205,6 +209,51 @@ func (m *Manager) ListReady() ([]Task, error) {
 	return ready, nil
 }
 
+func (m *Manager) ClaimReady(owner string) (Task, bool, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		return Task{}, false, fmt.Errorf("owner is required")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, task := range sortedTasks(m.tasks) {
+		if !isReadyUnclaimed(task) {
+			continue
+		}
+		task.Owner = owner
+		task.Status = StatusInProgress
+		m.tasks[task.ID] = task
+		if err := m.persistLocked(task); err != nil {
+			return Task{}, false, err
+		}
+		return task, true, nil
+	}
+	return Task{}, false, nil
+}
+
+func (m *Manager) Claim(id int, owner string) (Task, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		return Task{}, fmt.Errorf("owner is required")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	task, ok := m.tasks[id]
+	if !ok {
+		return Task{}, fmt.Errorf("task not found: %d", id)
+	}
+	if !isReadyUnclaimed(task) {
+		return Task{}, fmt.Errorf("task %d is not ready to claim", id)
+	}
+	task.Owner = owner
+	task.Status = StatusInProgress
+	m.tasks[task.ID] = task
+	if err := m.persistLocked(task); err != nil {
+		return Task{}, err
+	}
+	return task, nil
+}
+
 func (m *Manager) persistLocked(task Task) error {
 	if err := os.MkdirAll(m.dir, 0o755); err != nil {
 		return err
@@ -215,6 +264,10 @@ func (m *Manager) persistLocked(task Task) error {
 	}
 	data = append(data, '\n')
 	return os.WriteFile(filepath.Join(m.dir, fmt.Sprintf("task_%d.json", task.ID)), data, 0o644)
+}
+
+func isReadyUnclaimed(task Task) bool {
+	return task.Status == StatusPending && task.Owner == "" && len(task.BlockedBy) == 0
 }
 
 func (m *Manager) unblockDependentsLocked(completedID int) error {

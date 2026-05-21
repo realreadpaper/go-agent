@@ -105,6 +105,39 @@ func TestManagerListReadyFiltersBlockedOwnedAndNonPendingTasks(t *testing.T) {
 	}
 }
 
+func TestManagerClaimReadyTaskAssignsOwnerAndSkipsBlocked(t *testing.T) {
+	manager := NewManager(t.TempDir())
+	ready, err := manager.Create(CreateInput{Subject: "Ready"})
+	if err != nil {
+		t.Fatalf("Create ready returned error: %v", err)
+	}
+	blocker, err := manager.Create(CreateInput{Subject: "Blocker"})
+	if err != nil {
+		t.Fatalf("Create blocker returned error: %v", err)
+	}
+	if _, err := manager.Create(CreateInput{Subject: "Blocked", BlockedBy: []int{blocker.ID}}); err != nil {
+		t.Fatalf("Create blocked returned error: %v", err)
+	}
+
+	claimed, ok, err := manager.ClaimReady("alice")
+	if err != nil {
+		t.Fatalf("ClaimReady returned error: %v", err)
+	}
+	if !ok {
+		t.Fatal("ClaimReady ok = false, want true")
+	}
+	if claimed.ID != ready.ID || claimed.Owner != "alice" || claimed.Status != StatusInProgress {
+		t.Fatalf("claimed = %+v, want ready owned by alice and in_progress", claimed)
+	}
+	blocked, err := manager.Get(3)
+	if err != nil {
+		t.Fatalf("Get blocked returned error: %v", err)
+	}
+	if blocked.Owner != "" || blocked.Status != StatusPending {
+		t.Fatalf("blocked task = %+v, want untouched pending task", blocked)
+	}
+}
+
 func TestManagerRejectsInvalidStatusAndRestoresFromDisk(t *testing.T) {
 	root := t.TempDir()
 	manager := NewManager(root)

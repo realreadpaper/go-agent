@@ -196,7 +196,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 
 <h2>Steps</h2>
 
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写 FSM 测试**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 1: 写 FSM 测试**</span>
 <div class="step-detail">
 <p>覆盖：</p>
 <ul><li>新请求状态为 <code>pending</code>。</li>
@@ -205,7 +205,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <li>unknown request id 返回错误。</li></ul>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现通用请求模型**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 2: 实现通用请求模型**</span>
 <div class="step-detail">
 <pre><code class="lang-go"><span class="kw">type</span> Request <span class="kw">struct</span> {
 	ID      <span class="typ">string</span>         <span class="str">`json:&quot;id&quot;`</span>
@@ -219,9 +219,10 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>支持 kind:</p>
 <ul><li><code>shutdown</code></li>
 <li><code>plan_approval</code></li></ul>
+<p>实现中 <code>internal/protocols/fsm.go</code> 会把请求保存到 <code>.team/requests.json</code>，便于 CLI 查看和跨进程恢复。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 注册协议工具**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 3: 注册协议工具**</span>
 <div class="step-detail">
 <p>工具：</p>
 <ul><li><code>shutdown_request(teammate)</code></li>
@@ -232,16 +233,17 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>所有请求/响应通过 MessageBus 传递，并在 tracker 中更新状态。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现 graceful shutdown**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 4: 实现 graceful shutdown**</span>
 <div class="step-detail">
 <p>队友收到 approved shutdown 后：</p>
 <ul><li>完成当前工具轮。</li>
 <li>发送响应。</li>
 <li>状态改为 <code>shutdown</code>。</li>
 <li>goroutine 返回。</li></ul>
+<p>实现中 <code>shutdown_response</code> 批准后会更新 FSM，并调用 <code>team.Manager.Stop</code> 尝试停止目标队友。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 s10 CLI**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 5: 实现 s10 CLI**</span>
 <div class="step-detail">
 <p>Run:</p>
 
@@ -252,7 +254,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: shutdown request 有 request_id，状态从 pending 到 approved/rejected。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
 <div class="step-detail">
 <p>无网络验证要覆盖 request id、pending/approved/rejected 状态机和 inbox 事件顺序：</p>
 <pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
@@ -264,7 +266,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: request 有稳定 <code>request_id</code>；状态先是 <code>pending</code>，随后变为 <code>approved</code> 或 <code>rejected</code>，并写入对应 JSONL。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/protocols <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/cmd/s10-team-protocols
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add team request protocols&quot;</span></code></pre>

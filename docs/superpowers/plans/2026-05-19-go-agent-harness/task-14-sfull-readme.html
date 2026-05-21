@@ -208,12 +208,13 @@ li { margin: 4px 0; color: var(--text-muted); }
 
 <h2>Steps</h2>
 
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 组装 sfull**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 1: 组装 sfull**</span>
 <div class="step-detail">
 <p><code>sfull</code> 注册所有工具和 hook： 1. <code>tools.Registry</code> 注册 base tools + todo + task + load_skill + compact + task graph + background + team + protocols + autonomous + worktree。 2. <code>agent.Loop</code> 配置所有 BeforeCall 和 AfterTool hook。 3. REPL 支持用户输入和特殊命令。</p>
+<p><code>cmd/sfull</code> 已接入 <code>internal/worktree</code>，<code>/worktrees</code> 会输出当前 <code>.worktrees/index.json</code> 中的隔离目录记录。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 REPL 命令**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 2: 实现 REPL 命令**</span>
 <div class="step-detail">
 <p>支持：</p>
 <ul><li><code>/compact</code></li>
@@ -224,7 +225,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <li><code>/exit</code></li></ul>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 编写 README**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 3: 编写 README**</span>
 <div class="step-detail">
 <p>内容：</p>
 <ul><li>环境变量：<code>AGENT_LLM_PROVIDER</code>、<code>AGENT_LLM_API_STYLE</code>、<code>AGENT_MODEL</code>、<code>AGENT_REASONING_EFFORT</code>、<code>OPENAI_API_KEY</code>、<code>OPENAI_BASE_URL</code>、<code>DEEPSEEK_API_KEY</code>、<code>DEEPSEEK_BASE_URL</code>。</li>
@@ -266,7 +267,7 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com/anthropic \
 <li>安全声明：OpenAI hosted tools 不启用，本项目只执行本地 harness tools。</li></ul>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: smoke tests**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 4: smoke tests**</span>
 <div class="step-detail">
 <p>Smoke tests 不调用真实 API，使用 fake client 覆盖：</p>
 <ul><li>所有 cmd 包可编译。</li>
@@ -283,7 +284,7 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com/anthropic \
 <p>Expected: 全部 PASS。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 5: 实现后真实验证任务**</span>
 <div class="step-detail">
 <p>最终任务必须同时验证完整编译、并发 race、README 可操作性和真实模型 smoke：</p>
 <pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
@@ -296,7 +297,7 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com/anthropic \
 <p>Expected: <code>sfull</code> 能启动并执行 REPL/单次 prompt；README 中的每个命令都能对应到 <code>cmd/s01</code> 到 <code>cmd/s12</code> 或 <code>cmd/sfull</code>。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 提交**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 6: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/cmd/sfull <span class="kw">go</span>-agent/README.md <span class="kw">go</span>-agent/internal/integration
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add full harness demo&quot;</span></code></pre>

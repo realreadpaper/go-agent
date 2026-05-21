@@ -197,7 +197,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 
 <h2>Steps</h2>
 
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 1: 写任务认领测试**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 1: 写任务认领测试**</span>
 <div class="step-detail">
 <p>覆盖：</p>
 <ul><li>只认领 <code>pending</code>、<code>owner == ""</code>、<code>blockedBy == []</code> 的任务。</li>
@@ -205,7 +205,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <li>已阻塞任务不被认领。</li></ul>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 2: 实现 IDLE phase**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 2: 实现 IDLE phase**</span>
 <div class="step-detail">
 <pre><code class="lang-go"><span class="kw">type</span> IdleConfig <span class="kw">struct</span> {
 	PollInterval time.Duration
@@ -213,21 +213,23 @@ li { margin: 4px 0; color: var(--text-muted); }
 }</code></pre>
 
 <p>流程： 1. 每 5 秒读 inbox。 2. inbox 非空，注入 <code><inbox>...</inbox></code> 并回 WORK。 3. 扫描 ready unclaimed task。 4. 找到后 claim，并注入 <code><auto-claimed>Task #N: subject</auto-claimed></code>。 5. 60 秒无事可做则 shutdown。</p>
+<p>实现中 <code>internal/autonomous/idle.go</code> 的 <code>Controller.Wait</code> 会先检查 inbox，再调用 <code>tasks.Manager.ClaimReady</code> 原子认领任务。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 3: 实现 <code>idle</code> 和 <code>claim_task</code> 工具**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 3: 实现 <code>idle</code> 和 <code>claim_task</code> 工具**</span>
 <div class="step-detail">
 <p><code>idle</code> 工具让模型主动进入空闲阶段。<code>claim_task(task_id)</code> 手动认领任务，复用 TaskManager 校验。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 4: 实现身份重注入**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 4: 实现身份重注入**</span>
 <div class="step-detail">
 <p>当队友 messages 长度小于等于 3 时，在开头插入：</p>
 
 <pre><code class="lang-xml"><span class="kw">&lt;identity</span><span class="kw">&gt;</span>You are &#x27;alice&#x27;, role: coder, team: default. Continue your work.<span class="kw">&lt;/identity</span><span class="kw">&gt;</span></code></pre>
+<p><code>autonomous.IdentityHook</code> 会在短上下文时插入身份块，避免队友压缩后忘记自己的名字和角色。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 5: 实现 s11 CLI**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 5: 实现 s11 CLI**</span>
 <div class="step-detail">
 <p>支持 <code>/tasks</code> 和 <code>/team</code>。</p>
 
@@ -240,7 +242,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 队友能从 <code>.tasks/</code> 自动认领任务。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 6: 实现后真实验证任务**</span>
 <div class="step-detail">
 <p>无网络验证要覆盖 ready task 扫描、自动认领、阻塞任务跳过和 idle timeout：</p>
 <pre><code class="lang-bash"><span class="kw">cd</span> <span class="kw">go</span>-agent
@@ -252,7 +254,7 @@ li { margin: 4px 0; color: var(--text-muted); }
 <p>Expected: 任务 owner 写入队友名，状态变为 <code>in_progress</code>；有 blockedBy 的任务不会被自动认领。</p>
 </div>
 </div>
-<div class="checkbox-item"><input type="checkbox"  disabled><span class="step-title">Step 7: 提交**</span>
+<div class="checkbox-item"><input type="checkbox" checked disabled><span class="step-title">Step 7: 提交**</span>
 <div class="step-detail">
 <pre><code class="lang-bash"><span class="kw">git</span> add <span class="kw">go</span>-agent/internal/autonomous <span class="kw">go</span>-agent/internal/team <span class="kw">go</span>-agent/internal/tasks <span class="kw">go</span>-agent/cmd/s11-autonomous-agents
 <span class="kw">git</span> commit -m <span class="str">&quot;feat(<span class="kw">go</span>): add autonomous task claiming&quot;</span></code></pre>
